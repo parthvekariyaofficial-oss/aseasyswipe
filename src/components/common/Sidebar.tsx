@@ -177,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <img 
               src="/logo.png" 
               alt="AS EasySwipe Pvt Ltd" 
-              className="w-full max-h-12 object-contain select-none"
+              className="w-full max-h-12 object-contain select-none p-[3px]"
             />
           </div>
 
