@@ -101,12 +101,8 @@ export const AdminOverviewDashboard: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-12 animate-in fade-in duration-300">
       
-      {/* HEADER TITLE */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white">Dashboard Overview</h1>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">Real-time fintech metrics, earnings, bill service charges & platform stats</p>
-        </div>
+      {/* TOP ACTION BAR */}
+      <div className="flex items-center justify-end">
         <button
           onClick={fetchData}
           disabled={loading}
