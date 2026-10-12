@@ -8,9 +8,10 @@ import {
 
 interface LoginSplitScreenProps {
   onOpenResetPin?: () => void;
+  onBackToHome?: () => void;
 }
 
-export const LoginSplitScreen: React.FC<LoginSplitScreenProps> = ({ onOpenResetPin }) => {
+export const LoginSplitScreen: React.FC<LoginSplitScreenProps> = ({ onOpenResetPin, onBackToHome }) => {
   const { setAuth } = useAuthStore();
   const [loginStep, setLoginStep] = useState<'password' | 'mpin_verify'>('password');
   
@@ -124,6 +125,18 @@ export const LoginSplitScreen: React.FC<LoginSplitScreenProps> = ({ onOpenResetP
             {/* Ambient Background Glow */}
             <div className="absolute -top-24 -right-24 w-60 h-60 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
             <div className="absolute -bottom-24 -left-24 w-60 h-60 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Back to Home Button */}
+            {onBackToHome && (
+              <button
+                type="button"
+                onClick={onBackToHome}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition mb-4 group"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+                <span>← Back to Home</span>
+              </button>
+            )}
 
             {/* Login Header */}
             <div className="text-center mb-6">

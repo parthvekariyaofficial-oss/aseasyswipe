@@ -22,6 +22,7 @@ import { AdminPayoutManagement } from './components/payout/AdminPayoutManagement
 import { UserPayoutTransfer } from './components/payout/UserPayoutTransfer';
 import { UserAccountStatement } from './components/statement/UserAccountStatement';
 import { AdminMasterStatement } from './components/statement/AdminMasterStatement';
+import { LandingPage } from './components/home/LandingPage';
 import type { UserRole } from './types/auth';
 import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
 
@@ -67,6 +68,9 @@ export default function App() {
 
   const [showResetPinModal, setShowResetPinModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    return typeof window !== 'undefined' ? window.location.pathname : '/';
+  });
   const [activeTab, setActiveTabState] = useState<string>(() => {
     return getTabFromPath(window.location.pathname, user?.role);
   });
@@ -95,6 +99,7 @@ export default function App() {
   const handleTabChange = (tabId: string) => {
     setActiveTabState(tabId);
     const targetPath = getPathFromTab(tabId);
+    setCurrentPath(targetPath);
     if (window.location.pathname !== targetPath) {
       window.history.pushState({ tab: tabId }, '', targetPath);
     }
@@ -103,7 +108,9 @@ export default function App() {
   // Listen for browser Back / Forward buttons (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      const currentTab = getTabFromPath(window.location.pathname, user?.role);
+      const p = window.location.pathname;
+      setCurrentPath(p);
+      const currentTab = getTabFromPath(p, user?.role);
       setActiveTabState(currentTab);
     };
 
@@ -114,11 +121,13 @@ export default function App() {
   // Sync initial URL path and tab on auth load
   useEffect(() => {
     if (isAuthenticated) {
-      const currentTab = getTabFromPath(window.location.pathname, user?.role);
-      setActiveTabState(currentTab);
-      const targetPath = getPathFromTab(currentTab);
-      if (window.location.pathname === '/login' || window.location.pathname === '/') {
+      const p = window.location.pathname;
+      if (p === '/login' || p === '/') {
+        const currentTab = getTabFromPath(p, user?.role);
+        setActiveTabState(currentTab);
+        const targetPath = getPathFromTab(currentTab);
         window.history.replaceState({ tab: currentTab }, '', targetPath);
+        setCurrentPath(targetPath);
       }
     }
   }, [isAuthenticated, user?.role]);
@@ -190,12 +199,36 @@ export default function App() {
     }
   };
 
-  // 1. Not Authenticated -> Render Single Unified /login Route
+  // 1. Not Authenticated -> Show Landing Page on / and Login on /login
   if (!isAuthenticated || !user) {
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-      window.history.replaceState(null, '', '/login');
+    if (currentPath === '/login') {
+      return (
+        <>
+          <LoginSplitScreen
+            onBackToHome={() => {
+              window.history.pushState(null, '', '/');
+              setCurrentPath('/');
+            }}
+            onOpenResetPin={() => setShowResetPinModal(true)}
+          />
+          {showResetPinModal && (
+            <ResetPinOtpModal
+              isOpen={true}
+              onClose={() => setShowResetPinModal(false)}
+            />
+          )}
+        </>
+      );
     }
-    return <LoginSplitScreen />;
+
+    return (
+      <LandingPage
+        onNavigateToLogin={() => {
+          window.history.pushState(null, '', '/login');
+          setCurrentPath('/login');
+        }}
+      />
+    );
   }
 
   // 2. Force Change Password Guard
