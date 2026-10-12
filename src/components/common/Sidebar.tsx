@@ -43,6 +43,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: LayoutDashboard
         },
         {
+          id: 'users',
+          label: 'User Accounts',
+          icon: Users
+        },
+        {
+          id: 'qr_requests',
+          label: 'QR Payment Requests',
+          icon: FileText
+        },
+        {
+          id: 'admin_bill_requests',
+          label: 'CC Bill Requests',
+          icon: CreditCard
+        },
+        {
+          id: 'live_bill_history',
+          label: 'LiveBillPay History',
+          icon: Clock
+        },
+        {
           id: 'admin_payout',
           label: 'Payout Slabs & Txns',
           icon: ArrowRightLeft
@@ -53,34 +73,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: FileText
         },
         {
-          id: 'live_bill_history',
-          label: 'LiveBillPay History',
-          icon: Clock
-        },
-        {
-          id: 'users',
-          label: 'User Accounts',
-          icon: Users
-        },
-        {
           id: 'bank_entry',
           label: 'Bank Entry',
           icon: Landmark
         },
         {
-          id: 'admin_bill_requests',
-          label: 'CC Bill Requests',
-          icon: Receipt
-        },
-        {
           id: 'qr_master',
           label: 'QR Master',
           icon: QrCode
-        },
-        {
-          id: 'qr_requests',
-          label: 'QR Payment Requests',
-          icon: FileText
         }
       ];
     }
