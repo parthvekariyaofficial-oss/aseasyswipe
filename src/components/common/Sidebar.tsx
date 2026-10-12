@@ -168,15 +168,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Top Brand Header (Full Height Sidebar Top) */}
-        <div className="h-16 px-4 py-3 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-indigo-950/50 shrink-0">
-              AS
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-base font-black text-white leading-none truncate tracking-tight">AsEasySwipe</h1>
-              <p className="text-[11px] text-slate-400 font-medium mt-1 truncate">{user?.name}</p>
-            </div>
+        <div className="h-16 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900">
+          <div 
+            onClick={() => onTabChange('overview')}
+            className="bg-white rounded-xl px-3 py-1 shadow-sm flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+          >
+            <img 
+              src="/logo.png" 
+              alt="AS EasySwipe" 
+              className="h-9 w-auto object-contain"
+            />
           </div>
 
           <button 
