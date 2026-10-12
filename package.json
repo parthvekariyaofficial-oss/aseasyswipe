@@ -8,6 +8,7 @@
     "server": "tsx --watch server/index.js",
     "client": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "start": "node server/index.js",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import qrRoutes from './routes/qr.routes.js';
@@ -63,6 +66,21 @@ app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
 });
+
+// Serve frontend static build in production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const distPath = path.resolve(__dirname, '../dist');
+
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Start Express Server
 app.listen(PORT, '0.0.0.0', () => {
