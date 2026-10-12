@@ -162,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Container */}
       <aside className={`
         fixed lg:static top-0 left-0 bottom-0 z-50
-        w-72 sm:w-76 lg:w-80 h-full shrink-0 bg-slate-900 border-r border-slate-800
+        w-64 sm:w-68 lg:w-[265px] h-full shrink-0 bg-slate-900 border-r border-slate-800
         flex flex-col justify-between
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
