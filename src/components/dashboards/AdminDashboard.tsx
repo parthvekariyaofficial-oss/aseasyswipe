@@ -138,7 +138,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl">
         <div>
           <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-purple-400" /> Admin Command Center & User Hierarchy
+            <Users className="w-6 h-6 text-purple-400" /> USER LIST
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             Complete system control over accounts, user onboarding, role hierarchy, and security status.
