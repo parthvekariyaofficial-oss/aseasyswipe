@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Container */}
       <aside className={`
         fixed lg:static top-0 left-0 bottom-0 z-50
-        w-72 h-full shrink-0 bg-slate-900 border-r border-slate-800
+        w-72 sm:w-76 lg:w-80 h-full shrink-0 bg-slate-900 border-r border-slate-800
         flex flex-col justify-between
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -158,8 +158,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Links */}
-        <div className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
-          <p className="px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+        <div className="flex-1 px-3.5 py-4 space-y-1.5 overflow-y-auto">
+          <p className="px-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-2.5">
             Navigation Menu
           </p>
 
@@ -175,25 +175,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClose();
                 }}
                 className={`
-                  w-full flex items-center justify-between p-3 rounded-2xl font-medium text-xs transition-all duration-200 group
+                  w-full flex items-center justify-between px-3.5 py-3 rounded-2xl font-bold text-sm transition-all duration-200 group
                   ${isActive 
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-950/50 font-bold' 
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}
+                    ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-950/60' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'}
                 `}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`
-                    p-2 rounded-xl transition-colors
-                    ${isActive ? 'bg-white/20 text-white' : 'bg-slate-950 text-slate-400 group-hover:text-white group-hover:bg-slate-800'}
+                    p-2 rounded-xl transition-colors flex-shrink-0
+                    ${isActive ? 'bg-white/20 text-white shadow-sm' : 'bg-slate-950 text-slate-400 group-hover:text-indigo-400 group-hover:bg-slate-800'}
                   `}>
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-5 h-5" />
                   </div>
                   <div className="text-left truncate">
-                    <p className="truncate font-semibold">{item.label}</p>
+                    <p className="truncate font-bold tracking-tight">{item.label}</p>
                   </div>
                 </div>
 
-                <ChevronRight className={`w-4 h-4 transition-transform ${isActive ? 'text-white' : 'text-slate-600 group-hover:translate-x-0.5'}`} />
+                <ChevronRight className={`w-4 h-4 transition-transform flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:translate-x-1 group-hover:text-white'}`} />
               </button>
             );
           })}
