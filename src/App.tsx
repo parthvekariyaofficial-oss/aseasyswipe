@@ -270,118 +270,114 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Top Mobile & Desktop Navbar */}
-      <header className="sticky top-0 z-30 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-indigo-950/50">
-              AS
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-black text-white leading-none">AsEasySwipe</h1>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${getRoleBadgeStyle(user.role)}`}>
-                  {getRoleLabel(user.role)}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">{user.name}</p>
-            </div>
-          </div>
+    <div className="h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans flex antialiased selection:bg-indigo-500 selection:text-white">
+      {/* 1. Left Full Height Sidebar (Top-to-Bottom 100vh) */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-          {/* Active Page Title in Header */}
-          <div className="flex items-center gap-2 pl-3 sm:pl-4 border-l border-slate-800">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse hidden sm:block" />
-            <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white tracking-tight flex items-center gap-1.5 truncate max-w-[160px] sm:max-w-none">
-              {getPageTitle(activeTab, user.role)}
-            </h2>
-          </div>
-        </div>
-
-        {/* Right Header Stats & Profile */}
-        <div className="flex items-center gap-3">
-          {/* Main Wallet pill (Hidden for Admin) */}
-          {user.role !== 'admin' && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
-              <Wallet className="w-4 h-4 text-emerald-400" />
-              <div className="text-right">
-                <p className="text-[9px] uppercase font-bold text-slate-400">Main Wallet</p>
-                <p className="text-xs font-black text-emerald-400">
-                  ₹{Number(user.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Session Timer */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs font-mono">
-            <Clock className="w-3.5 h-3.5 text-indigo-400" />
-            <span>{formatTimer(sessionRemainingSeconds)}</span>
-          </div>
-
-          {/* User Profile Dropdown */}
-          <div className="relative">
+      {/* 2. Right Main Layout Column (Header + Content) */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Top Navbar Header */}
+        <header className="h-16 shrink-0 bg-slate-900/90 border-b border-slate-800 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between z-30">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile Hamburger Menu */}
             <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 transition"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0"
             >
-              <img
-                src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff`}
-                alt={user.name}
-                className="w-7 h-7 rounded-lg object-cover"
-              />
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <Menu className="w-5 h-5" />
             </button>
 
-            {showProfileMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95">
-                <div className="px-4 py-2 border-b border-slate-800">
-                  <p className="text-xs font-bold text-white truncate">{user.name}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{user.email || user.mobile_number}</p>
+            {/* Mobile Brand Logo */}
+            <div className="lg:hidden flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-black text-white text-xs shadow-md">
+                AS
+              </div>
+            </div>
+
+            {/* Active Page Title in Header */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse hidden sm:block shrink-0" />
+              <h1 className="text-base sm:text-lg font-black text-white tracking-tight truncate">
+                {getPageTitle(activeTab, user.role)}
+              </h1>
+            </div>
+          </div>
+
+          {/* Right Header Stats & Profile */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Main Wallet pill (Hidden for Admin) */}
+            {user.role !== 'admin' && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
+                <Wallet className="w-4 h-4 text-emerald-400" />
+                <div className="text-right">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Main Wallet</p>
+                  <p className="text-xs font-black text-emerald-400">
+                    ₹{Number(user.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
-
-                <button
-                  onClick={() => {
-                    setShowResetPinModal(true);
-                    setShowProfileMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-                >
-                  <Key className="w-4 h-4 text-indigo-400" /> Reset 4-Digit TPIN
-                </button>
-
-                <div className="border-t border-slate-800 my-1" />
-
-                <button
-                  onClick={() => {
-                    setShowProfileMenu(false);
-                    logout();
-                  }}
-                  className="w-full text-left px-4 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" /> Log Out
-                </button>
               </div>
             )}
+
+            {/* Session Timer */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs font-mono">
+              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{formatTimer(sessionRemainingSeconds)}</span>
+            </div>
+
+            {/* User Profile Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center gap-2 p-1 pl-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 transition"
+              >
+                <img
+                  src={user.profile_photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff`}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-lg object-cover"
+                />
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in zoom-in-95">
+                  <div className="px-4 py-2 border-b border-slate-800">
+                    <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{user.email || user.mobile_number}</p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowResetPinModal(true);
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                  >
+                    <Key className="w-4 h-4 text-indigo-400" /> Reset 4-Digit TPIN
+                  </button>
+
+                  <div className="border-t border-slate-800 my-1" />
+
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      logout();
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" /> Log Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Body Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-
+        {/* Main Body Layout */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950">
           {activeTab === 'dashboard' && (
             <ProtectedRoute allowedRoles={['admin']}>

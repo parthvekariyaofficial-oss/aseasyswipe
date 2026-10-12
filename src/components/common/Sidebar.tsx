@@ -27,6 +27,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout, decrementTimer } = useAuthStore();
 
+  const getRoleLabel = (role?: string) => {
+    switch (role) {
+      case 'admin': return 'Super Admin HQ';
+      case 'super_distributor': return 'Super Distributor (MS)';
+      case 'distributor': return 'Distributor (DS)';
+      case 'user': return 'Retailer Merchant';
+      default: return 'User';
+    }
+  };
+
+  const getRoleBadgeStyle = (role?: string) => {
+    switch (role) {
+      case 'admin': return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+      case 'super_distributor': return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      case 'distributor': return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+      case 'user': return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      default: return 'bg-gray-500/20 text-gray-300 border-gray-500/40';
+    }
+  };
+
   React.useEffect(() => {
     const interval = setInterval(() => {
       decrementTimer();
@@ -147,11 +167,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Top Close Bar for Mobile */}
-        <div className="p-3 flex justify-end lg:hidden border-b border-slate-800">
+        {/* Top Brand Header (Full Height Sidebar Top) */}
+        <div className="h-16 px-4 py-3 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-indigo-950/50 shrink-0">
+              AS
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-sm font-black text-white leading-none truncate">AsEasySwipe</h1>
+                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${getRoleBadgeStyle(user?.role)}`}>
+                  {getRoleLabel(user?.role)}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{user?.name}</p>
+            </div>
+          </div>
+
           <button 
             onClick={onClose} 
-            className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800"
+            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
