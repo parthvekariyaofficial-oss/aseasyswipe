@@ -169,6 +169,39 @@ export default function App() {
     }
   };
 
+  const getPageTitle = (tab: string, role?: string): string => {
+    switch (tab) {
+      case 'dashboard':
+        return role === 'admin' ? 'Overview & Earnings' : 'Dashboard Overview';
+      case 'users':
+        return role === 'admin' ? 'User Accounts' : 'Dashboard & Account';
+      case 'qr_requests':
+        return 'QR Payment Requests';
+      case 'admin_bill_requests':
+        return 'CC Bill Requests';
+      case 'live_bill_history':
+        return 'LiveBillPay History';
+      case 'admin_payout':
+        return 'Payout Slabs & Txns';
+      case 'payout_transfer':
+        return 'Instant Payout';
+      case 'admin_statement':
+        return 'Account Passbook';
+      case 'user_statement':
+        return 'Account Passbook';
+      case 'bank_entry':
+        return 'Bank Entry';
+      case 'qr_master':
+        return 'QR Master';
+      case 'live_bill_pay':
+        return 'Live Bill Pay';
+      case 'bill_request':
+        return 'Credit Card Bill Payment';
+      default:
+        return 'Dashboard';
+    }
+  };
+
   const renderDashboardByRole = (role?: UserRole) => {
     switch (role) {
       case 'admin':
@@ -260,6 +293,14 @@ export default function App() {
               </div>
               <p className="text-[10px] text-slate-400 font-medium mt-0.5">{user.name}</p>
             </div>
+          </div>
+
+          {/* Active Page Title in Header */}
+          <div className="flex items-center gap-2 pl-3 sm:pl-4 border-l border-slate-800">
+            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse hidden sm:block" />
+            <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white tracking-tight flex items-center gap-1.5 truncate max-w-[160px] sm:max-w-none">
+              {getPageTitle(activeTab, user.role)}
+            </h2>
           </div>
         </div>
 
