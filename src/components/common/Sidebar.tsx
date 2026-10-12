@@ -167,17 +167,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Top Brand Banner (Full Width Sidebar Banner) */}
-        <div className="relative w-full border-b border-slate-800 bg-slate-950 shrink-0 overflow-hidden">
+        {/* Top Brand Banner (Full Width Sidebar Banner - Aligned to h-16) */}
+        <div className="relative w-full h-16 border-b border-slate-800 bg-slate-950 shrink-0 overflow-hidden flex items-center justify-center">
           <div 
             onClick={() => onTabChange('overview')}
-            className="w-full cursor-pointer hover:opacity-95 transition-opacity block"
+            className="w-full h-full cursor-pointer hover:opacity-95 transition-opacity flex items-center justify-center"
             title="Overview & Earnings"
           >
             <img 
               src="/logo.png" 
               alt="AS EasySwipe Pvt Ltd" 
-              className="w-full h-auto object-cover block select-none"
+              className="w-full h-full object-cover select-none"
             />
           </div>
 
