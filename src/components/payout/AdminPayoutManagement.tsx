@@ -259,20 +259,12 @@ export const AdminPayoutManagement: React.FC = () => {
 
         {/* ACTION BUTTON */}
         <div className="flex items-center gap-2">
-          {activeTab === 'slabs' ? (
+          {activeTab === 'slabs' && (
             <button
               onClick={openAddSlabModal}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Create New Slab
-            </button>
-          ) : (
-            <button
-              onClick={fetchTransactions}
-              disabled={txnsLoading}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold border border-slate-800 flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${txnsLoading ? 'animate-spin' : ''}`} /> Refresh Transactions
             </button>
           )}
         </div>

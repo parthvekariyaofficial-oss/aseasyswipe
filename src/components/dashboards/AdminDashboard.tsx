@@ -134,32 +134,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* HEADER BAR */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl">
-        <div>
-          <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <Users className="w-6 h-6 text-purple-400" /> USER LIST
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Complete system control over accounts, user onboarding, role hierarchy, and security status.
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg flex items-center space-x-2 transition"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Onboard New User</span>
-          </button>
-          <button
-            onClick={fetchUsers}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+      {/* TOP ACTION BAR */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg flex items-center space-x-2 transition"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Onboard New User</span>
+        </button>
       </div>
 
       {/* STATS OVERVIEW */}

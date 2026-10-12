@@ -94,17 +94,7 @@ export const AdminLiveBillPayHistory: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-16 animate-in fade-in duration-300">
       
-      {/* TOP ACTION BAR */}
-      <div className="flex items-center justify-end">
-        <button
-          onClick={fetchAdminHistory}
-          disabled={loading}
-          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold flex items-center gap-2 transition shadow-sm"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh History</span>
-        </button>
-      </div>
+
 
       {/* METRICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -174,14 +174,6 @@ export const AdminMasterStatement: React.FC = () => {
           >
             <Download className="w-4 h-4" /> Export CSV
           </button>
-          <button
-            onClick={fetchStatement}
-            disabled={loading}
-            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer shadow-sm"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 

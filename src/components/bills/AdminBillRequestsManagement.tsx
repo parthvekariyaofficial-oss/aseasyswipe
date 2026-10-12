@@ -181,21 +181,13 @@ export const AdminBillRequestsManagement: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Action Bar */}
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setIsSlabModalOpen(true)}
           className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-300 hover:text-white font-bold text-xs transition shadow-sm"
         >
           <Sliders className="w-4 h-4 text-indigo-400" />
           <span>Charge Slabs ({slabs.length})</span>
-        </button>
-
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition shadow-sm"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 

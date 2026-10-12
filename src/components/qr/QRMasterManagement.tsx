@@ -229,33 +229,23 @@ export const QRMasterManagement: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* TOP CONTROL BAR: TABS & ACTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-2xl shadow-sm">
-          <button
-            onClick={() => setActiveTab('set_qr')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'set_qr' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Set Active User QR
-          </button>
-          <button
-            onClick={() => setActiveTab('master')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'master' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            QR Master Entry
-          </button>
-        </div>
-
+      {/* TOP CONTROL BAR: TABS */}
+      <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-2xl shadow-sm w-fit">
         <button
-          onClick={() => fetchQrList(true)}
-          className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm self-end sm:self-auto"
-          title="Refresh Real-time Data"
+          onClick={() => setActiveTab('set_qr')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+            activeTab === 'set_qr' ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/40' : 'text-slate-400 hover:text-white'
+          }`}
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Set Active User QR
+        </button>
+        <button
+          onClick={() => setActiveTab('master')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+            activeTab === 'master' ? 'bg-purple-600 text-white shadow-lg shadow-purple-950/40' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          QR Master Entry
         </button>
       </div>
 

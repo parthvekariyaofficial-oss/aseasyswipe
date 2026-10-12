@@ -101,17 +101,7 @@ export const AdminOverviewDashboard: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-12 animate-in fade-in duration-300">
       
-      {/* TOP ACTION BAR */}
-      <div className="flex items-center justify-end">
-        <button
-          onClick={fetchData}
-          disabled={loading}
-          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition flex items-center gap-2 shadow-sm"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${loading ? 'animate-spin' : ''}`} />
-          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-        </button>
-      </div>
+
 
       {/* USEPAY B2B AGENT API BALANCE INTEGRATION WIDGET */}
       <UsePayBalanceWidget />

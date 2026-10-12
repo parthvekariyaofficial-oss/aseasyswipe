@@ -206,7 +206,7 @@ export const QRPaymentRequests: React.FC = () => {
     <div className="space-y-6 w-full pb-10">
       
       {/* HEADER / ACTIONS */}
-      {!isAdmin ? (
+      {!isAdmin && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl">
           <div>
             <h2 className="text-2xl font-extrabold text-white flex items-center gap-2 tracking-tight">
@@ -217,24 +217,6 @@ export const QRPaymentRequests: React.FC = () => {
               Scan active QR code, transfer funds, enter 12-digit UTR and request instant credit.
             </p>
           </div>
-
-          <button
-            onClick={() => fetchData(true)}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition flex items-center gap-2 text-xs font-bold"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Realtime Sync</span>
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-end">
-          <button
-            onClick={() => fetchData(true)}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-2 text-xs font-bold shadow-sm"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Realtime Sync</span>
-          </button>
         </div>
       )}
 
