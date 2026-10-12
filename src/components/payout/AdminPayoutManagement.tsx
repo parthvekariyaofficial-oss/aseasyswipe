@@ -231,63 +231,50 @@ export const AdminPayoutManagement: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* HEADER BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase inline-flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Super Admin Controls
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
-              Payout Slab & Transfer Management
-            </h1>
-            <p className="text-xs text-slate-400">
-              Configure dynamic service charge slabs for wallet payouts and monitor real-time bank transfers.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {activeTab === 'slabs' ? (
-              <button
-                onClick={openAddSlabModal}
-                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-              >
-                <Plus className="w-4 h-4" /> Create New Slab
-              </button>
-            ) : (
-              <button
-                onClick={fetchTransactions}
-                disabled={txnsLoading}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${txnsLoading ? 'animate-spin' : ''}`} /> Refresh Transactions
-              </button>
-            )}
-          </div>
-        </div>
-
+      {/* TOP CONTROL BAR: TABS & ACTION BUTTON */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* TABS */}
-        <div className="flex items-center gap-3 mt-6 border-t border-slate-800/80 pt-4">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('slabs')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'slabs'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             <Sliders className="w-4 h-4" /> Dynamic Slabs ({slabs.length})
           </button>
           <button
             onClick={() => setActiveTab('transactions')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'transactions'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             <Clock className="w-4 h-4" /> Payout Transactions ({transactions.length})
           </button>
+        </div>
+
+        {/* ACTION BUTTON */}
+        <div className="flex items-center gap-2">
+          {activeTab === 'slabs' ? (
+            <button
+              onClick={openAddSlabModal}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Create New Slab
+            </button>
+          ) : (
+            <button
+              onClick={fetchTransactions}
+              disabled={txnsLoading}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold border border-slate-800 flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${txnsLoading ? 'animate-spin' : ''}`} /> Refresh Transactions
+            </button>
+          )}
         </div>
       </div>
 

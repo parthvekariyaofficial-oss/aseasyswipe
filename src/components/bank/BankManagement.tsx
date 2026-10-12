@@ -179,46 +179,24 @@ export const BankManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 p-5 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-md">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-indigo-950/50">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <Landmark className="w-6 h-6 text-indigo-400" />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-white tracking-tight">Bank Entry Management</h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                Admin Panel
-              </span>
-            </div>
-            <p className="text-xs font-medium text-slate-400 mt-0.5">
-              Create and manage bank list for payment options and admin setup
-            </p>
-          </div>
-        </div>
+      {/* Top Action Bar */}
+      <div className="flex items-center justify-end gap-3">
+        <button
+          onClick={fetchBanks}
+          disabled={loading}
+          className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition shadow-sm"
+          title="Refresh bank list"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
 
-        {/* TOP RIGHT CORNER: Add Bank Button */}
-        <div className="flex items-center gap-3 self-end sm:self-auto">
-          <button
-            onClick={fetchBanks}
-            disabled={loading}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white transition shadow-sm"
-            title="Refresh bank list"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs shadow-lg shadow-indigo-900/40 hover:shadow-indigo-900/60 transition duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Bank</span>
-          </button>
-        </div>
+        <button
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs shadow-lg shadow-indigo-900/40 hover:shadow-indigo-900/60 transition duration-200"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Bank</span>
+        </button>
       </div>
 
       {/* Notifications / Alerts */}

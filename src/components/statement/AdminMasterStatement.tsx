@@ -151,122 +151,112 @@ export const AdminMasterStatement: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* HEADER BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase inline-flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" /> Super Admin Ledger Center
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
-              {isSingleUser ? `${account?.name} - Account Passbook` : 'Master Company Account Statement'}
-            </h1>
-            <p className="text-xs text-slate-400">
-              {isSingleUser
-                ? `Firm: ${account?.firm_name} • Mobile: ${account?.mobile_number}`
-                : 'Central ledger tracking all platform inflows, outflows, refunds, and wallet movements'}
+      {/* TOP ACTION BAR */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {isSingleUser ? (
+          <div className="text-xs text-slate-400 font-medium">
+            Account: <span className="text-white font-bold">{account?.name}</span> ({account?.firm_name} • {account?.mobile_number})
+          </div>
+        ) : <div />}
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            disabled={!statement || statement.entries.length === 0}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+          >
+            <Printer className="w-4 h-4" /> Print Passbook
+          </button>
+          <button
+            onClick={handleExportCSV}
+            disabled={!statement || statement.entries.length === 0}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-50 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={fetchStatement}
+            disabled={loading}
+            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer shadow-sm"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* USER SELECTOR DROPDOWN BAR */}
+      <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+          <Users className="w-4 h-4 text-indigo-400" />
+          <span>Select Target Account:</span>
+        </div>
+
+        <div className="w-full sm:w-96">
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none cursor-pointer"
+          >
+            <option value="">🏢 All Users (Company-Wide Master View)</option>
+            {usersList.map((u) => (
+              <option key={u.id} value={u.id}>
+                👤 {u.name} ({u.firm_name || 'Retailer'}) - {u.mobile_number} [₹{Number(u.wallet_balance || 0).toFixed(2)}]
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* 5-SUMMARY CARDS GRID */}
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-md">
+            <p className="text-[10px] uppercase font-bold text-slate-400">{isSingleUser ? 'Opening Balance' : 'System Baseline'}</p>
+            <p className="text-lg font-black text-white mt-1">
+              ₹{summary.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowPrintModal(true)}
-              disabled={!statement || statement.entries.length === 0}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
-            >
-              <Printer className="w-4 h-4" /> Print Passbook
-            </button>
-            <button
-              onClick={handleExportCSV}
-              disabled={!statement || statement.entries.length === 0}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" /> Export CSV
-            </button>
-            <button
-              onClick={fetchStatement}
-              disabled={loading}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+          <div className="bg-slate-900 border border-emerald-500/20 p-4 rounded-2xl shadow-md">
+            <p className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
+              <ArrowDownLeft className="w-3.5 h-3.5" /> Total Inflow (Credits)
+            </p>
+            <p className="text-lg font-black text-emerald-400 mt-1">
+              +₹{summary.total_credits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
+
+          <div className="bg-slate-900 border border-rose-500/20 p-4 rounded-2xl shadow-md">
+            <p className="text-[10px] uppercase font-bold text-rose-400 flex items-center gap-1">
+              <ArrowUpRight className="w-3.5 h-3.5" /> Total Outflow (Debits)
+            </p>
+            <p className="text-lg font-black text-rose-400 mt-1">
+              -₹{summary.total_debits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-500/10 via-slate-900 to-purple-500/10 border border-amber-500/30 p-4 rounded-2xl shadow-md">
+            <p className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Platform Commission
+            </p>
+            <p className="text-lg font-black text-amber-300 mt-1">
+              ₹{summary.total_commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[9px] text-slate-400 mt-0.5">{isSingleUser ? 'User Earnings' : 'Combined Distribution'}</p>
+          </div>
+
+          <div className="bg-slate-900 border border-indigo-500/30 p-4 rounded-2xl col-span-2 sm:col-span-1 shadow-md">
+            <p className="text-[10px] uppercase font-bold text-indigo-400">{isSingleUser ? 'User Net Balance' : 'Total System Float'}</p>
+            <p className="text-xl font-black text-white mt-1">
+              ₹{summary.closing_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[9px] text-slate-400 mt-0.5">{summary.total_entries_count} Entries in Period</p>
+          </div>
+
         </div>
-
-        {/* USER SELECTOR DROPDOWN BAR */}
-        <div className="mt-6 p-3 bg-slate-950/90 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-            <Users className="w-4 h-4 text-indigo-400" />
-            <span>Select Target Account:</span>
-          </div>
-
-          <div className="w-full sm:w-96">
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none cursor-pointer"
-            >
-              <option value="">🏢 All Users (Company-Wide Master View)</option>
-              {usersList.map((u) => (
-                <option key={u.id} value={u.id}>
-                  👤 {u.name} ({u.firm_name || 'Retailer'}) - {u.mobile_number} [₹{Number(u.wallet_balance || 0).toFixed(2)}]
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* 5-SUMMARY CARDS GRID */}
-        {summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-5 border-t border-slate-800/80 pt-5">
-            
-            <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl">
-              <p className="text-[10px] uppercase font-bold text-slate-400">{isSingleUser ? 'Opening Balance' : 'System Baseline'}</p>
-              <p className="text-lg font-black text-white mt-1">
-                ₹{summary.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-emerald-500/20 p-4 rounded-2xl">
-              <p className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
-                <ArrowDownLeft className="w-3.5 h-3.5" /> Total Inflow (Credits)
-              </p>
-              <p className="text-lg font-black text-emerald-400 mt-1">
-                +₹{summary.total_credits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-rose-500/20 p-4 rounded-2xl">
-              <p className="text-[10px] uppercase font-bold text-rose-400 flex items-center gap-1">
-                <ArrowUpRight className="w-3.5 h-3.5" /> Total Outflow (Debits)
-              </p>
-              <p className="text-lg font-black text-rose-400 mt-1">
-                -₹{summary.total_debits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-amber-500/10 via-slate-950/90 to-purple-500/10 border border-amber-500/30 p-4 rounded-2xl">
-              <p className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Platform Commission
-              </p>
-              <p className="text-lg font-black text-amber-300 mt-1">
-                ₹{summary.total_commission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-[9px] text-slate-400 mt-0.5">{isSingleUser ? 'User Earnings' : 'Combined Distribution'}</p>
-            </div>
-
-            <div className="bg-slate-950/90 border border-indigo-500/30 p-4 rounded-2xl col-span-2 sm:col-span-1 shadow-md">
-              <p className="text-[10px] uppercase font-bold text-indigo-400">{isSingleUser ? 'User Net Balance' : 'Total System Float'}</p>
-              <p className="text-xl font-black text-white mt-1">
-                ₹{summary.closing_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-[9px] text-slate-400 mt-0.5">{summary.total_entries_count} Entries in Period</p>
-            </div>
-
-          </div>
-        )}
-      </div>
+      )}
 
       {/* FILTER BAR */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">

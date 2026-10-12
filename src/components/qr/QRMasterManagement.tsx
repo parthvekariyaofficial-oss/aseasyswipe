@@ -229,45 +229,34 @@ export const QRMasterManagement: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* HEADER BAR */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl">
-        <div>
-          <h2 className="text-2xl font-extrabold text-white flex items-center gap-2 tracking-tight">
-            <QrCode className="w-7 h-7 text-purple-400" /> QR Code Master & Realtime Management
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Create payment QRs, set active UPI targets for user panel, and toggle live status.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex bg-slate-950 border border-slate-800 p-1 rounded-2xl">
-            <button
-              onClick={() => setActiveTab('set_qr')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-                activeTab === 'set_qr' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Set Active User QR
-            </button>
-            <button
-              onClick={() => setActiveTab('master')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-                activeTab === 'master' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              QR Master Entry
-            </button>
-          </div>
-
+      {/* TOP CONTROL BAR: TABS & ACTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-2xl shadow-sm">
           <button
-            onClick={() => fetchQrList(true)}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-            title="Refresh Real-time Data"
+            onClick={() => setActiveTab('set_qr')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              activeTab === 'set_qr' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Set Active User QR
+          </button>
+          <button
+            onClick={() => setActiveTab('master')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+              activeTab === 'master' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            QR Master Entry
           </button>
         </div>
+
+        <button
+          onClick={() => fetchQrList(true)}
+          className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition shadow-sm self-end sm:self-auto"
+          title="Refresh Real-time Data"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* 2 TOGGLE CONTROLS BANNER (USER QR INVISIBLE & QR REQUEST SECTION OFF) */}

@@ -94,29 +94,12 @@ export const AdminLiveBillPayHistory: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-16 animate-in fade-in duration-300">
       
-      {/* PAGE HEADER */}
-      <div className="bg-gradient-to-r from-slate-900 via-purple-950/40 to-slate-900 border border-purple-500/30 p-6 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-950/50">
-            <Clock className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black text-white">LiveBillPay History</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                BBPS System Master Audit Log
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1 font-medium">
-              Real-Time System-Wide Audit Log of All BBPS Credit Card Bill Payments
-            </p>
-          </div>
-        </div>
-
+      {/* TOP ACTION BAR */}
+      <div className="flex items-center justify-end">
         <button
           onClick={fetchAdminHistory}
           disabled={loading}
-          className="px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold flex items-center gap-2 transition shadow-lg"
+          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold flex items-center gap-2 transition shadow-sm"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh History</span>
