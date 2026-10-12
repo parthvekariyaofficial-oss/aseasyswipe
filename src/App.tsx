@@ -293,8 +293,8 @@ export default function App() {
             </button>
 
             {/* Mobile Brand Logo */}
-            <div className="lg:hidden flex items-center shrink-0 bg-white rounded-lg px-2 py-0.5 shadow-sm">
-              <img src="/logo.png" alt="AS EasySwipe" className="h-7 w-auto object-contain" />
+            <div className="lg:hidden flex items-center shrink-0">
+              <img src="/logo.png" alt="AS EasySwipe" className="h-8 w-auto object-contain rounded-lg" />
             </div>
 
             {/* Active Page Title in Header */}

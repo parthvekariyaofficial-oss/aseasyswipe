@@ -167,24 +167,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Top Brand Header (Full Height Sidebar Top) */}
-        <div className="h-16 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900">
+        {/* Top Brand Banner (Full Width Sidebar Banner) */}
+        <div className="relative w-full border-b border-slate-800 bg-slate-950 shrink-0 overflow-hidden">
           <div 
             onClick={() => onTabChange('overview')}
-            className="bg-white rounded-xl px-3 py-1 shadow-sm flex items-center justify-center cursor-pointer hover:opacity-95 transition-opacity"
+            className="w-full cursor-pointer hover:opacity-95 transition-opacity block"
+            title="Overview & Earnings"
           >
             <img 
               src="/logo.png" 
-              alt="AS EasySwipe" 
-              className="h-9 w-auto object-contain"
+              alt="AS EasySwipe Pvt Ltd" 
+              className="w-full h-auto object-cover block select-none"
             />
           </div>
 
+          {/* Mobile Close Button */}
           <button 
             onClick={onClose} 
-            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 shrink-0"
+            className="lg:hidden absolute top-2 right-2 text-white/80 hover:text-white bg-slate-950/70 hover:bg-slate-900 backdrop-blur-sm p-1.5 rounded-lg shrink-0 border border-white/10 z-10 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
