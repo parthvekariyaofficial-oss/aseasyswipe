@@ -174,13 +174,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               AS
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-black text-white leading-none truncate">AsEasySwipe</h1>
-                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border shrink-0 ${getRoleBadgeStyle(user?.role)}`}>
-                  {getRoleLabel(user?.role)}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{user?.name}</p>
+              <h1 className="text-base font-black text-white leading-none truncate tracking-tight">AsEasySwipe</h1>
+              <p className="text-[11px] text-slate-400 font-medium mt-1 truncate">{user?.name}</p>
             </div>
           </div>
 

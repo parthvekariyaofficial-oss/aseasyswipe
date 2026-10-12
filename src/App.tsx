@@ -310,6 +310,11 @@ export default function App() {
 
           {/* Right Header Stats & Profile */}
           <div className="flex items-center gap-3 shrink-0">
+            {/* Role Tag Badge (e.g. Super Admin HQ) */}
+            <span className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider border shadow-sm ${getRoleBadgeStyle(user.role)}`}>
+              {getRoleLabel(user.role)}
+            </span>
+
             {/* Main Wallet pill (Hidden for Admin) */}
             {user.role !== 'admin' && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800">
