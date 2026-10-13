@@ -1,25 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { userApi } from '../../services/api';
+import { userApi, qrApi } from '../../services/api';
 import type { UserProfile } from '../../types/auth';
+import type { QrPaymentRequest } from '../../types/qr';
 import { useAuthStore } from '../../store/authStore';
 import { AddUserModal } from '../common/AddUserModal';
-import { Award, Users, Wallet, ShieldCheck, UserPlus, RefreshCw } from 'lucide-react';
+import { Award, Users, Wallet, ShieldCheck, UserPlus, RefreshCw, QrCode, Coins, ArrowUpRight } from 'lucide-react';
 
 export const SuperDistributorDashboard: React.FC = () => {
   const { user } = useAuthStore();
   const [teamMembers, setTeamMembers] = useState<UserProfile[]>([]);
+  const [qrRequests, setQrRequests] = useState<QrPaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const fetchTeam = async () => {
     setLoading(true);
     try {
-      const res = await userApi.getHierarchy();
-      if (res.success) {
-        setTeamMembers(res.users);
+      const [hierarchyRes, qrRes] = await Promise.all([
+        userApi.getHierarchy().catch(() => ({ success: false, users: [] })),
+        qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] }))
+      ]);
+
+      if (hierarchyRes.success && Array.isArray(hierarchyRes.users)) {
+        setTeamMembers(hierarchyRes.users);
+      }
+      if (qrRes.success && Array.isArray(qrRes.payment_requests)) {
+        setQrRequests(qrRes.payment_requests);
       }
     } catch (err) {
-      console.error('Fetch Hierarchy Error:', err);
+      console.error('Fetch Hierarchy & QR Error:', err);
     } finally {
       setLoading(false);
     }
@@ -34,6 +43,10 @@ export const SuperDistributorDashboard: React.FC = () => {
   const totalDownstreamBalance = teamMembers
     .filter(u => u.id !== user?.id)
     .reduce((acc, u) => acc + (u.wallet_balance || 0), 0);
+
+  const approvedQr = qrRequests.filter(r => r.status === 'approved');
+  const totalApprovedQrVolume = approvedQr.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+  const totalMsCommission = approvedQr.reduce((acc, r) => acc + Number(r.super_distributor_commission || 0), 0);
 
   return (
     <div className="space-y-6 w-full pb-10">
@@ -68,34 +81,66 @@ export const SuperDistributorDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
           <div>
-            <p className="text-xs font-semibold text-slate-400">Mapped Distributors (DS)</p>
+            <p className="text-xs font-semibold text-slate-400">Mapped DS</p>
             <p className="text-xl font-bold text-indigo-400 mt-1">{distributors.length}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Distributors</p>
           </div>
           <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Users className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
           <div>
             <p className="text-xs font-semibold text-slate-400">Mapped Retailers</p>
             <p className="text-xl font-bold text-emerald-400 mt-1">{retailers.length}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Active Outlets</p>
           </div>
           <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Users className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
           <div>
-            <p className="text-xs font-semibold text-slate-400">Downstream Network Balance</p>
-            <p className="text-xl font-bold text-cyan-400 mt-1">
+            <p className="text-xs font-semibold text-slate-400">Downline QR Volume</p>
+            <p className="text-xl font-bold text-purple-300 mt-1 font-mono">
+              ₹{totalApprovedQrVolume.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="flex items-center gap-1 text-[10px] text-purple-400/80 mt-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>{approvedQr.length} Loads</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <QrCode className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-semibold text-slate-400">QR Comm (MS)</p>
+            <p className="text-xl font-bold text-amber-400 mt-1 font-mono">
+              ₹{totalMsCommission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-amber-400/80 mt-0.5">Hierarchy Earning</p>
+          </div>
+          <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Coins className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-xs font-semibold text-slate-400">Network Balance</p>
+            <p className="text-xl font-bold text-cyan-400 mt-1 font-mono">
               ₹{totalDownstreamBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">All Wallets</p>
           </div>
           <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
             <Wallet className="w-6 h-6" />

@@ -1,33 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { userApi } from '../../services/api';
+import { userApi, qrApi } from '../../services/api';
 import type { UserProfile } from '../../types/auth';
+import type { QrPaymentRequest } from '../../types/qr';
 import { useAuthStore } from '../../store/authStore';
 import { AddUserModal } from '../common/AddUserModal';
-import { Users, Wallet, RefreshCw, Store, UserPlus } from 'lucide-react';
+import { Users, Wallet, RefreshCw, Store, UserPlus, QrCode, Coins, ArrowUpRight } from 'lucide-react';
 
 export const DistributorDashboard: React.FC = () => {
   const { user } = useAuthStore();
   const [retailers, setRetailers] = useState<UserProfile[]>([]);
+  const [qrRequests, setQrRequests] = useState<QrPaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const fetchRetailers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await userApi.getHierarchy();
-      if (res.success) {
-        setRetailers(res.users.filter(u => u.role === 'user'));
+      const [hierarchyRes, qrRes] = await Promise.all([
+        userApi.getHierarchy().catch(() => ({ success: false, users: [] })),
+        qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] }))
+      ]);
+
+      if (hierarchyRes.success && Array.isArray(hierarchyRes.users)) {
+        setRetailers(hierarchyRes.users.filter(u => u.role === 'user'));
+      }
+      if (qrRes.success && Array.isArray(qrRes.payment_requests)) {
+        setQrRequests(qrRes.payment_requests);
       }
     } catch (err) {
-      console.error('Fetch Hierarchy Error:', err);
+      console.error('Fetch Hierarchy & QR Error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRetailers();
+    fetchData();
   }, []);
+
+  const approvedQr = qrRequests.filter(r => r.status === 'approved');
+  const totalApprovedQrVolume = approvedQr.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+  const totalDsCommission = approvedQr.reduce((acc, r) => acc + Number(r.distributor_commission || 0), 0);
+  const totalRetailerBalance = retailers.reduce((acc, r) => acc + Number(r.wallet_balance || 0), 0);
 
   return (
     <div className="space-y-6 w-full pb-10">
@@ -61,11 +75,67 @@ export const DistributorDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-[9px] uppercase font-bold text-slate-400">Distributor Wallet</p>
-                <p className="text-lg font-black text-white">
+                <p className="text-lg font-black text-white font-mono">
                   ₹{Number(user?.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* PRIMARY STATS CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400">Mapped Retailers</p>
+            <p className="text-2xl font-bold text-blue-400 mt-1">{retailers.length}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Downline Outlets</p>
+          </div>
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl">
+            <Users className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400">Downline Approved QR Volume</p>
+            <p className="text-2xl font-bold text-emerald-400 mt-1 font-mono">
+              ₹{totalApprovedQrVolume.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="flex items-center gap-1 text-[10px] text-emerald-400/80 mt-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>{approvedQr.length} Approved Loads</span>
+            </div>
+          </div>
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+            <QrCode className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400">QR Commission Earned (DS)</p>
+            <p className="text-2xl font-bold text-purple-300 mt-1 font-mono">
+              ₹{totalDsCommission.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-purple-400/80 mt-0.5">Markup Margin Revenue</p>
+          </div>
+          <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
+            <Coins className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400">Downline Network Balance</p>
+            <p className="text-2xl font-bold text-cyan-400 mt-1 font-mono">
+              ₹{totalRetailerBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Live Retailer Wallets</p>
+          </div>
+          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-xl">
+            <Wallet className="w-6 h-6" />
           </div>
         </div>
       </div>
@@ -85,7 +155,7 @@ export const DistributorDashboard: React.FC = () => {
               <span>+ Add Retailer</span>
             </button>
             <button
-              onClick={fetchRetailers}
+              onClick={fetchData}
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
               title="Refresh Network"
             >
@@ -160,7 +230,7 @@ export const DistributorDashboard: React.FC = () => {
       <AddUserModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onUserAdded={fetchRetailers}
+        onUserAdded={fetchData}
         defaultRole="user"
       />
 

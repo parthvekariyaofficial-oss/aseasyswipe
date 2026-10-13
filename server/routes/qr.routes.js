@@ -676,6 +676,13 @@ router.get('/request/list', verifyToken, async (req, res) => {
 
     if (supabase) {
       try {
+        if (!db.users || db.users.length === 0) {
+          const { data: uData } = await supabase.from('users_profiles').select('*');
+          if (uData && Array.isArray(uData)) {
+            db.users = uData;
+          }
+        }
+
         const { data, error } = await supabase
           .from('qr_payment_requests')
           .select('id, user_id, qr_master_id, amount, utr_number, mobile_number, status, charge_percent, charge_amount, net_amount, distributor_commission, super_distributor_commission, rejection_reason, processed_at, processed_by, created_at')
@@ -683,12 +690,15 @@ router.get('/request/list', verifyToken, async (req, res) => {
 
         if (!error && data) {
           db.qr_payment_requests = data.map(r => {
-            const u = db.users.find(u => u.id === r.user_id);
-            const q = db.qr_masters.find(qm => qm.id === r.qr_master_id);
+            const u = (db.users || []).find(u => u.id === r.user_id);
+            const q = (db.qr_masters || []).find(qm => qm.id === r.qr_master_id);
             return {
               ...r,
               user_name: u ? u.name : (r.user_name || 'Retailer User'),
               firm_name: u ? u.firm_name : (r.firm_name || 'N/A'),
+              mobile_number: r.mobile_number || (u ? u.mobile_number : ''),
+              distributor_id: u ? u.distributor_id : null,
+              super_distributor_id: u ? u.super_distributor_id : null,
               qr_name: q ? q.name : (r.qr_name || 'Active QR'),
               upi_id: q ? q.upi_id : (r.upi_id || '')
             };
@@ -701,7 +711,34 @@ router.get('/request/list', verifyToken, async (req, res) => {
 
     let list = db.qr_payment_requests || [];
 
-    if (user.role !== 'admin') {
+    if (user.role === 'admin') {
+      // Admin sees all
+    } else if (user.role === 'distributor') {
+      // Distributor sees all requests from downline retailers mapped to them and their own
+      const downlineUserIds = new Set(
+        (db.users || [])
+          .filter(u => u.distributor_id === user.id || u.id === user.id)
+          .map(u => u.id)
+      );
+      downlineUserIds.add(user.id);
+      list = list.filter(r => downlineUserIds.has(r.user_id));
+    } else if (user.role === 'super_distributor') {
+      // Master Distributor sees all requests from downline distributors and retailers
+      const downlineDistributorIds = (db.users || [])
+        .filter(u => u.super_distributor_id === user.id || u.id === user.id)
+        .map(u => u.id);
+      const downlineDistSet = new Set(downlineDistributorIds);
+      downlineDistSet.add(user.id);
+
+      const downlineUserIds = new Set(
+        (db.users || [])
+          .filter(u => u.super_distributor_id === user.id || downlineDistSet.has(u.distributor_id) || u.id === user.id)
+          .map(u => u.id)
+      );
+      downlineUserIds.add(user.id);
+      list = list.filter(r => downlineUserIds.has(r.user_id));
+    } else {
+      // Regular user sees only their own
       list = list.filter(r => r.user_id === user.id);
     }
 

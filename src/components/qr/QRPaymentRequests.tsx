@@ -6,12 +6,15 @@ import type { QrMaster, QrPaymentRequest } from '../../types/qr';
 import { 
   QrCode, Copy, Check, Upload, ArrowRight, ShieldCheck, 
   AlertCircle, CheckCircle2, Clock, XCircle, Search, RefreshCw, 
-  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter 
+  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter, Coins 
 } from 'lucide-react';
 
 export const QRPaymentRequests: React.FC = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
+  const isDistributor = user?.role === 'distributor';
+  const isSuperDistributor = user?.role === 'super_distributor';
+  const isChannelPartner = isDistributor || isSuperDistributor;
 
   // Active QR for Retailer
   const [activeQr, setActiveQr] = useState<QrMaster | null>(null);
@@ -59,7 +62,7 @@ export const QRPaymentRequests: React.FC = () => {
         setQrRequestSectionEnabled(setRes.settings.qr_request_section_enabled !== false);
       }
 
-      if (!isAdmin) {
+      if (!isAdmin && !isChannelPartner) {
         const activeRes = await qrApi.getActiveQr();
         if (activeRes.success) {
           setActiveQr(activeRes.qr_master);
@@ -263,8 +266,8 @@ export const QRPaymentRequests: React.FC = () => {
       if (r.status !== statusFilter) return false;
     }
 
-    // 4. Admin Search (User, Firm, Mobile, QR Name)
-    if (isAdmin && searchTerm.trim()) {
+    // 4. Admin & Channel Partner Search (User, Firm, Mobile, QR Name)
+    if ((isAdmin || isChannelPartner) && searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
       const matches =
         (r.user_name || '').toLowerCase().includes(q) ||
@@ -284,11 +287,23 @@ export const QRPaymentRequests: React.FC = () => {
     .filter(r => r.status === 'approved')
     .reduce((sum, r) => sum + (r.net_amount || 0), 0);
 
+  const totalCommissionEarned = requestsList
+    .filter(r => r.status === 'approved')
+    .reduce((sum, r) => {
+      if (isSuperDistributor) {
+        return sum + Number(r.super_distributor_commission || 0);
+      }
+      if (isDistributor) {
+        return sum + Number(r.distributor_commission || 0);
+      }
+      return sum;
+    }, 0);
+
   return (
     <div className="space-y-6 w-full pb-10">
       
-      {/* HEADER / ACTIONS */}
-      {!isAdmin && (
+      {/* HEADER / ACTIONS (REGULAR RETAILER) */}
+      {!isAdmin && !isChannelPartner && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl">
           <div>
             <h2 className="text-2xl font-extrabold text-white flex items-center gap-2 tracking-tight">
@@ -297,6 +312,24 @@ export const QRPaymentRequests: React.FC = () => {
             </h2>
             <p className="text-xs text-slate-400 mt-1">
               Scan active QR code, transfer funds, enter 12-digit UTR and request instant credit.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER / ACTIONS (CHANNEL PARTNER: DISTRIBUTOR & SUPER DISTRIBUTOR) */}
+      {isChannelPartner && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-7 rounded-3xl shadow-2xl">
+          <div className="space-y-1">
+            <span className="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-bold uppercase tracking-wider">
+              {isSuperDistributor ? 'Master Network Downline (MS)' : 'Distributor Network Downline (DS)'}
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2 tracking-tight">
+              <QrCode className="w-7 h-7 text-purple-400" /> 
+              Downline QR Payment History
+            </h2>
+            <p className="text-xs text-slate-400">
+              Live tracking of QR payment requests and commission earnings across your mapped downstream network.
             </p>
           </div>
         </div>
@@ -318,7 +351,7 @@ export const QRPaymentRequests: React.FC = () => {
       )}
 
       {/* RETAILER VIEW (WHEN REQUEST SECTION IS DISABLED) */}
-      {!isAdmin && !qrRequestSectionEnabled && (
+      {!isAdmin && !isChannelPartner && !qrRequestSectionEnabled && (
         <div className="bg-slate-900 border border-amber-500/30 p-8 rounded-3xl text-center space-y-4 shadow-2xl relative overflow-hidden">
           <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-lg">
             <XCircle className="w-8 h-8" />
@@ -336,7 +369,7 @@ export const QRPaymentRequests: React.FC = () => {
       )}
 
       {/* RETAILER VIEW (LEFT: ACTIVE QR DISPLAY 65%, RIGHT: SUBMISSION FORM 35%) */}
-      {!isAdmin && qrRequestSectionEnabled && (
+      {!isAdmin && !isChannelPartner && qrRequestSectionEnabled && (
         <div className="flex flex-col lg:flex-row gap-6 items-stretch">
           
           {/* LEFT SIDE: ACTIVE QR CODE & UPI DETAILS (65%) */}
@@ -569,7 +602,51 @@ export const QRPaymentRequests: React.FC = () => {
         </div>
       )}
 
-      {/* PAYMENT REQUESTS HISTORY TABLE (ADMIN & USER) */}
+      {/* CHANNEL PARTNER (DISTRIBUTOR / SUPER DISTRIBUTOR) STATS CARDS */}
+      {isChannelPartner && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-400">Downline Approved Volume</p>
+              <p className="text-xl font-bold text-emerald-400 mt-1 font-mono">
+                ₹{totalApprovedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{approvedCount} Settled Payment(s)</p>
+            </div>
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-400">Pending Approvals</p>
+              <p className="text-xl font-bold text-amber-400 mt-1">{pendingCount}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Under Admin Verification</p>
+            </div>
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
+              <Clock className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-400">
+                {isSuperDistributor ? 'Your Commission (MS)' : 'Your Commission (DS)'}
+              </p>
+              <p className="text-xl font-bold text-purple-300 mt-1 font-mono">
+                ₹{totalCommissionEarned.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-[10px] text-purple-400/80 mt-0.5">Earned from Downline Loads</p>
+            </div>
+            <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
+              <Coins className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT REQUESTS HISTORY TABLE (ADMIN, CHANNEL PARTNER, & USER) */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-4">
         
         {/* TABLE SEARCH & FILTER HEADER */}
@@ -578,13 +655,19 @@ export const QRPaymentRequests: React.FC = () => {
             <div>
               <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                 <FileText className="w-5 h-5 text-purple-400" />
-                {isAdmin ? 'All User QR Payment Requests' : 'My Payment Requests History'}
+                {isAdmin 
+                  ? 'All User QR Payment Requests' 
+                  : isChannelPartner 
+                  ? 'Downline QR Payment Requests History' 
+                  : 'My Payment Requests History'}
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
                   {filteredRequests.length}{filteredRequests.length !== requestsList.length ? ` / ${requestsList.length}` : ''}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Filter by date range, UTR number, or transaction status
+                {isChannelPartner
+                  ? 'Real-time record of all QR wallet reload requests made across your downstream retailers'
+                  : 'Filter by date range, UTR number, or transaction status'}
               </p>
             </div>
 
@@ -673,13 +756,13 @@ export const QRPaymentRequests: React.FC = () => {
               <option value="rejected" className="bg-slate-900">Rejected</option>
             </select>
 
-            {/* Admin Search Bar (User, Firm, QR, Mobile) */}
-            {isAdmin && (
+            {/* Admin & Channel Partner Search Bar (User, Firm, QR, Mobile) */}
+            {(isAdmin || isChannelPartner) && (
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search user, firm, mobile..."
+                  placeholder={isAdmin ? "Search user, firm, mobile..." : "Search downline retailer, firm, mobile..."}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
@@ -710,8 +793,12 @@ export const QRPaymentRequests: React.FC = () => {
                 <th className="p-4">12-Digit UTR</th>
                 <th className="p-4">Requested Amt</th>
                 <th className="p-4">Charge (%)</th>
-                {isAdmin && <th className="p-4 text-amber-400">DS Comm</th>}
-                {isAdmin && <th className="p-4 text-indigo-300">MS Comm</th>}
+                {(isAdmin || isDistributor) && (
+                  <th className="p-4 text-amber-400">{isDistributor ? 'Your Comm (DS)' : 'DS Comm'}</th>
+                )}
+                {(isAdmin || isSuperDistributor) && (
+                  <th className="p-4 text-indigo-300">{isSuperDistributor ? 'Your Comm (MS)' : 'MS Comm'}</th>
+                )}
                 {isAdmin && <th className="p-4 text-emerald-400">Admin Comm</th>}
                 <th className="p-4">Net Credit</th>
                 <th className="p-4">Status</th>
@@ -721,13 +808,13 @@ export const QRPaymentRequests: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={isAdmin ? 13 : 10} className="p-8 text-center text-slate-500">
+                  <td colSpan={isAdmin ? 13 : isChannelPartner ? 11 : 10} className="p-8 text-center text-slate-500">
                     Loading QR payment requests...
                   </td>
                 </tr>
               ) : filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 13 : 10} className="p-8 text-center text-slate-500">
+                  <td colSpan={isAdmin ? 13 : isChannelPartner ? 11 : 10} className="p-8 text-center text-slate-500">
                     No payment requests found.
                   </td>
                 </tr>
@@ -795,15 +882,15 @@ export const QRPaymentRequests: React.FC = () => {
                       {r.charge_percent || 0.50}% (-₹{Number(r.charge_amount || 0).toFixed(2)})
                     </td>
 
-                    {/* DS COMMISSION (ADMIN ONLY) */}
-                    {isAdmin && (
+                    {/* DS COMMISSION (ADMIN OR DISTRIBUTOR) */}
+                    {(isAdmin || isDistributor) && (
                       <td className="p-4 font-mono font-bold text-amber-400">
                         +₹{Number(r.distributor_commission || 0).toFixed(2)}
                       </td>
                     )}
 
-                    {/* MS COMMISSION (ADMIN ONLY) */}
-                    {isAdmin && (
+                    {/* MS COMMISSION (ADMIN OR SUPER DISTRIBUTOR) */}
+                    {(isAdmin || isSuperDistributor) && (
                       <td className="p-4 font-mono font-bold text-indigo-300">
                         +₹{Number(r.super_distributor_commission || 0).toFixed(2)}
                       </td>

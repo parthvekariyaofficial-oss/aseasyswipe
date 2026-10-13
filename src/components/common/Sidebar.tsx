@@ -150,6 +150,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       });
     }
 
+    if (user?.role === 'distributor' || user?.role === 'super_distributor') {
+      items.push({
+        id: 'qr_requests',
+        label: 'QR Payment History',
+        icon: QrCode
+      });
+    }
+
     return items;
   };
 
