@@ -11,7 +11,7 @@ import {
 import { useSettingsStore } from '../../store/settingsStore';
 
 export const AdminPayoutManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'slabs' | 'transactions'>('slabs');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'slabs'>('transactions');
 
   const { instantPayoutEnabled, toggleInstantPayout, fetchSettings: fetchPayoutSettings } = useSettingsStore();
   const [isTogglingPayout, setIsTogglingPayout] = useState<boolean>(false);
@@ -79,6 +79,7 @@ export const AdminPayoutManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    fetchTransactions();
     fetchSlabs();
     fetchPayoutSettings();
   }, [fetchPayoutSettings]);
@@ -357,16 +358,6 @@ export const AdminPayoutManagement: React.FC = () => {
         {/* TABS */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab('slabs')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'slabs'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <Sliders className="w-4 h-4" /> Dynamic Slabs ({slabs.length})
-          </button>
-          <button
             onClick={() => setActiveTab('transactions')}
             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'transactions'
@@ -375,6 +366,16 @@ export const AdminPayoutManagement: React.FC = () => {
             }`}
           >
             <Clock className="w-4 h-4" /> Payout Transactions ({transactions.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('slabs')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'slabs'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Sliders className="w-4 h-4" /> Dynamic Slabs ({slabs.length})
           </button>
         </div>
 
