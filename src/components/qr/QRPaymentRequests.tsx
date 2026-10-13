@@ -6,7 +6,7 @@ import type { QrMaster, QrPaymentRequest } from '../../types/qr';
 import { 
   QrCode, Copy, Check, Upload, ArrowRight, ShieldCheck, 
   AlertCircle, CheckCircle2, Clock, XCircle, Search, RefreshCw, 
-  CheckCircle, X, Eye, FileText, Lock 
+  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter 
 } from 'lucide-react';
 
 export const QRPaymentRequests: React.FC = () => {
@@ -42,9 +42,13 @@ export const QRPaymentRequests: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [previewScreenshot, setPreviewScreenshot] = useState<string | null>(null);
 
-  // Filter State for Admin
+  // Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [utrFilter, setUtrFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const fetchData = async (isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -187,13 +191,91 @@ export const QRPaymentRequests: React.FC = () => {
     }
   };
 
+  const isAnyFilterActive = Boolean(
+    searchTerm.trim() ||
+    utrFilter.trim() ||
+    statusFilter !== 'ALL' ||
+    dateFilter !== 'ALL' ||
+    customStartDate ||
+    customEndDate
+  );
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setUtrFilter('');
+    setStatusFilter('ALL');
+    setDateFilter('ALL');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
   const filteredRequests = requestsList.filter(r => {
-    const matchesSearch = (r.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (r.utr_number || '').includes(searchTerm) ||
-                          (r.mobile_number || '').includes(searchTerm) ||
-                          (r.firm_name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    // 1. Date Filter
+    if (dateFilter !== 'ALL') {
+      if (!r.created_at) return false;
+      const d = new Date(r.created_at);
+      const t = d.getTime();
+      if (isNaN(t)) return false;
+
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+      if (dateFilter === 'TODAY') {
+        if (t < startOfToday || t > endOfToday) return false;
+      } else if (dateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (t < startOfYesterday || t > endOfYesterday) return false;
+      } else if (dateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (t < startOf7Days || t > endOfToday) return false;
+      } else if (dateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (t < startOf30Days || t > endOfToday) return false;
+      } else if (dateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (t < startOfMonth || t > endOfToday) return false;
+      } else if (dateFilter === 'CUSTOM') {
+        if (customStartDate) {
+          const [sY, sM, sD] = customStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (t < startTime) return false;
+        }
+        if (customEndDate) {
+          const [eY, eM, eD] = customEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (t > endTime) return false;
+        }
+      }
+    }
+
+    // 2. UTR Number Filter
+    if (utrFilter.trim()) {
+      const cleanUtr = utrFilter.trim().toLowerCase();
+      if (!(r.utr_number || '').toLowerCase().includes(cleanUtr)) {
+        return false;
+      }
+    }
+
+    // 3. Status Filter
+    if (statusFilter !== 'ALL') {
+      if (r.status !== statusFilter) return false;
+    }
+
+    // 4. Admin Search (User, Firm, Mobile, QR Name)
+    if (isAdmin && searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      const matches =
+        (r.user_name || '').toLowerCase().includes(q) ||
+        (r.mobile_number || '').includes(q) ||
+        (r.firm_name || '').toLowerCase().includes(q) ||
+        (r.qr_name || '').toLowerCase().includes(q) ||
+        (r.utr_number || '').toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+
+    return true;
   });
 
   const pendingCount = requestsList.filter(r => r.status === 'pending').length;
@@ -491,37 +573,129 @@ export const QRPaymentRequests: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-4">
         
         {/* TABLE SEARCH & FILTER HEADER */}
-        <div className="p-4 border-b border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-purple-400" />
-            {isAdmin ? `All User QR Payment Requests (${requestsList.length})` : 'My Payment Requests History'}
-          </h3>
+        <div className="p-4 sm:p-5 border-b border-slate-800/80 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-purple-400" />
+                {isAdmin ? 'All User QR Payment Requests' : 'My Payment Requests History'}
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                  {filteredRequests.length}{filteredRequests.length !== requestsList.length ? ` / ${requestsList.length}` : ''}
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Filter by date range, UTR number, or transaction status
+              </p>
+            </div>
 
-          {isAdmin && (
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
+            {isAnyFilterActive && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          {/* FILTERS BAR */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            {/* Date Range Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+              <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as any)}
+                className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
+              >
+                <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+                <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+                <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+                <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+                <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+                <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+                <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+              </select>
+            </div>
+
+            {/* Custom Range Inputs (when dateFilter === 'CUSTOM') */}
+            {dateFilter === 'CUSTOM' && (
+              <div className="flex items-center gap-2 bg-slate-950 border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs">
+                <span className="text-[11px] text-slate-400 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+                />
+                <span className="text-[11px] text-slate-400 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+                />
+              </div>
+            )}
+
+            {/* UTR Number Filter Input */}
+            <div className="relative min-w-[180px] sm:w-52">
+              <Hash className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Filter by UTR No..."
+                value={utrFilter}
+                onChange={(e) => setUtrFilter(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 font-mono"
+              />
+              {utrFilter && (
+                <button
+                  type="button"
+                  onClick={() => setUtrFilter('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter Dropdown */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none font-medium cursor-pointer"
+            >
+              <option value="ALL" className="bg-slate-900">All Statuses</option>
+              <option value="pending" className="bg-slate-900">Pending</option>
+              <option value="approved" className="bg-slate-900">Approved</option>
+              <option value="rejected" className="bg-slate-900">Rejected</option>
+            </select>
+
+            {/* Admin Search Bar (User, Firm, QR, Mobile) */}
+            {isAdmin && (
+              <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search by User, Firm, QR Name, Mobile, or UTR..."
+                  placeholder="Search user, firm, mobile..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl p-2 focus:outline-none"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* TABLE CONTENT */}
@@ -551,14 +725,14 @@ export const QRPaymentRequests: React.FC = () => {
                     Loading QR payment requests...
                   </td>
                 </tr>
-              ) : (isAdmin ? filteredRequests : requestsList).length === 0 ? (
+              ) : filteredRequests.length === 0 ? (
                 <tr>
                   <td colSpan={isAdmin ? 13 : 10} className="p-8 text-center text-slate-500">
                     No payment requests found.
                   </td>
                 </tr>
               ) : (
-                (isAdmin ? filteredRequests : requestsList).map((r) => (
+                filteredRequests.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-800/40 transition">
                     
                     {/* DATE & TIME (1ST COLUMN) */}
