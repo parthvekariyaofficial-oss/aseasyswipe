@@ -20,7 +20,10 @@ import {
   X,
   AlertTriangle,
   AlertCircle,
-  Info
+  Info,
+  Calendar,
+  Search,
+  Filter
 } from 'lucide-react';
 
 export const UserBillPaymentRequest: React.FC = () => {
@@ -47,6 +50,93 @@ export const UserBillPaymentRequest: React.FC = () => {
 
   // Live service charge calculation
   const [calculatedCharge, setCalculatedCharge] = useState<number>(25);
+
+  // Filter State
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const isAnyFilterActive = Boolean(
+    searchQuery.trim() ||
+    filterStatus !== 'all' ||
+    dateFilter !== 'ALL' ||
+    customStartDate ||
+    customEndDate
+  );
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setFilterStatus('all');
+    setDateFilter('ALL');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
+  const filteredRequests = requests.filter(req => {
+    // 1. Date Filter
+    if (dateFilter !== 'ALL') {
+      if (!req.created_at) return false;
+      const d = new Date(req.created_at);
+      const t = d.getTime();
+      if (isNaN(t)) return false;
+
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+      if (dateFilter === 'TODAY') {
+        if (t < startOfToday || t > endOfToday) return false;
+      } else if (dateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (t < startOfYesterday || t > endOfYesterday) return false;
+      } else if (dateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (t < startOf7Days || t > endOfToday) return false;
+      } else if (dateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (t < startOf30Days || t > endOfToday) return false;
+      } else if (dateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (t < startOfMonth || t > endOfToday) return false;
+      } else if (dateFilter === 'CUSTOM') {
+        if (customStartDate) {
+          const [sY, sM, sD] = customStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (t < startTime) return false;
+        }
+        if (customEndDate) {
+          const [eY, eM, eD] = customEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (t > endTime) return false;
+        }
+      }
+    }
+
+    // 2. Status Filter
+    if (filterStatus !== 'all' && req.status !== filterStatus) {
+      return false;
+    }
+
+    // 3. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        req.customer_name.toLowerCase().includes(q) ||
+        req.card_number.includes(q) ||
+        req.bank_name.toLowerCase().includes(q) ||
+        req.mobile_number.includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    return true;
+  });
+
+  const pendingCount = requests.filter(r => r.status === 'pending').length;
+  const approvedCount = requests.filter(r => r.status === 'approved').length;
+  const rejectedCount = requests.filter(r => r.status === 'rejected').length;
 
   const loadData = async () => {
     try {
@@ -482,24 +572,123 @@ export const UserBillPaymentRequest: React.FC = () => {
       )}
 
       {/* RECENT REQUESTS TABLE */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-3 p-5">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-          <h3 className="text-sm font-black text-white flex items-center gap-2">
-            <Clock className="w-4 h-4 text-indigo-400" /> My Bill Payment Requests History
-          </h3>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-4 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-indigo-400" /> My Bill Payment Requests History
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                {filteredRequests.length}{filteredRequests.length !== requests.length ? ` / ${requests.length}` : ''}
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Filter by date range, request status, or customer name
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isAnyFilterActive && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Clear Filters
+              </button>
+            )}
+
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white transition"
+              title="Refresh requests"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* FILTERS BAR */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search customer, card, bank..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs font-medium text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Range Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+              <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+              <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+            </select>
+          </div>
+
+          {/* Custom Date Pickers */}
+          {dateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-indigo-500/40 rounded-xl px-3 py-1.5 text-xs">
+              <span className="text-[11px] text-slate-400 font-medium">From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+              <span className="text-[11px] text-slate-400 font-medium">To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+          )}
+
+          {/* Status Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer font-medium"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">All Requests ({requests.length})</option>
+              <option value="pending" className="bg-slate-900 text-slate-200">Pending ({pendingCount})</option>
+              <option value="approved" className="bg-slate-900 text-slate-200">Approved ({approvedCount})</option>
+              <option value="rejected" className="bg-slate-900 text-slate-200">Reject ({rejectedCount})</option>
+            </select>
+          </div>
         </div>
 
         {loading ? (
           <div className="p-8 text-center text-slate-400 text-xs">Loading request history...</div>
-        ) : requests.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-xs">No bill payment requests submitted yet.</div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 text-xs">No matching bill payment requests found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -515,7 +704,7 @@ export const UserBillPaymentRequest: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {requests.map(req => (
+                {filteredRequests.map(req => (
                   <tr key={req.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       {req.created_at ? (

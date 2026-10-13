@@ -17,7 +17,10 @@ import {
   Building2,
   User,
   Sliders,
-  DollarSign
+  DollarSign,
+  Calendar,
+  RotateCcw,
+  Filter
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -30,6 +33,9 @@ export const AdminBillRequestsManagement: React.FC = () => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Rejection Modal
   const [rejectingReq, setRejectingReq] = useState<CreditCardBillRequest | null>(null);
@@ -193,20 +199,82 @@ export const AdminBillRequestsManagement: React.FC = () => {
     }
   };
 
+  const isAnyFilterActive = Boolean(
+    searchQuery.trim() ||
+    filterStatus !== 'all' ||
+    dateFilter !== 'ALL' ||
+    customStartDate ||
+    customEndDate
+  );
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setFilterStatus('all');
+    setDateFilter('ALL');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
   const filteredRequests = requests.filter(req => {
-    const matchesSearch =
-      req.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.card_number.includes(searchQuery) ||
-      req.bank_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (req.user_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.mobile_number.includes(searchQuery);
+    // 1. Date Filter
+    if (dateFilter !== 'ALL') {
+      if (!req.created_at) return false;
+      const d = new Date(req.created_at);
+      const t = d.getTime();
+      if (isNaN(t)) return false;
 
-    const matchesFilter =
-      filterStatus === 'all'
-        ? true
-        : filterStatus === req.status;
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
 
-    return matchesSearch && matchesFilter;
+      if (dateFilter === 'TODAY') {
+        if (t < startOfToday || t > endOfToday) return false;
+      } else if (dateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (t < startOfYesterday || t > endOfYesterday) return false;
+      } else if (dateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (t < startOf7Days || t > endOfToday) return false;
+      } else if (dateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (t < startOf30Days || t > endOfToday) return false;
+      } else if (dateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (t < startOfMonth || t > endOfToday) return false;
+      } else if (dateFilter === 'CUSTOM') {
+        if (customStartDate) {
+          const [sY, sM, sD] = customStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (t < startTime) return false;
+        }
+        if (customEndDate) {
+          const [eY, eM, eD] = customEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (t > endTime) return false;
+        }
+      }
+    }
+
+    // 2. Status Filter
+    if (filterStatus !== 'all' && req.status !== filterStatus) {
+      return false;
+    }
+
+    // 3. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch =
+        req.customer_name.toLowerCase().includes(q) ||
+        req.card_number.includes(q) ||
+        req.bank_name.toLowerCase().includes(q) ||
+        (req.user_name || '').toLowerCase().includes(q) ||
+        req.mobile_number.includes(q) ||
+        (req.user_mobile || '').includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    return true;
   });
 
   const pendingCount = requests.filter(r => r.status === 'pending').length;
@@ -382,59 +450,103 @@ export const AdminBillRequestsManagement: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-3.5 rounded-2xl border border-slate-800">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search customer, card, bank, mobile..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
-          />
+      <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
+              Filter Bill Requests
+            </span>
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+              {filteredRequests.length}{filteredRequests.length !== requests.length ? ` / ${requests.length}` : ''}
+            </span>
+          </div>
+
+          {isAnyFilterActive && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Clear Filters
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              filterStatus === 'all'
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-750'
-            }`}
-          >
-            All Requests ({requests.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('pending')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              filterStatus === 'pending'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-750'
-            }`}
-          >
-            Pending ({pendingCount})
-          </button>
-          <button
-            onClick={() => setFilterStatus('approved')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              filterStatus === 'approved'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-750'
-            }`}
-          >
-            Approved ({approvedCount})
-          </button>
-          <button
-            onClick={() => setFilterStatus('rejected')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              filterStatus === 'rejected'
-                ? 'bg-rose-600 text-white shadow-md'
-                : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-750'
-            }`}
-          >
-            Rejected ({rejectedCount})
-          </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search customer, card, bank, mobile..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs font-medium text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Range Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+              <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+              <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+            </select>
+          </div>
+
+          {/* Custom Date Inputs (when dateFilter === 'CUSTOM') */}
+          {dateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-indigo-500/40 rounded-xl px-3 py-1.5 text-xs">
+              <span className="text-[11px] text-slate-400 font-medium">From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+              <span className="text-[11px] text-slate-400 font-medium">To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+          )}
+
+          {/* Status Dropdown (Converted from buttons) */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer font-medium"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">All Requests ({requests.length})</option>
+              <option value="pending" className="bg-slate-900 text-slate-200">Pending ({pendingCount})</option>
+              <option value="approved" className="bg-slate-900 text-slate-200">Approved ({approvedCount})</option>
+              <option value="rejected" className="bg-slate-900 text-slate-200">Reject ({rejectedCount})</option>
+            </select>
+          </div>
         </div>
       </div>
 
