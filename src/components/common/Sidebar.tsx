@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose
 }) => {
   const { user, logout, decrementTimer } = useAuthStore();
-  const { liveBillPayEnabled, instantPayoutEnabled } = useSettingsStore();
+  const { liveBillPayEnabled, instantPayoutEnabled, ccBillPayEnabled } = useSettingsStore();
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
@@ -138,11 +138,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: Zap
         });
       }
-      items.push({
-        id: 'bill_request',
-        label: 'Credit Card Bill Pay',
-        icon: CreditCard
-      });
+      if (ccBillPayEnabled) {
+        items.push({
+          id: 'bill_request',
+          label: 'Credit Card Bill Pay',
+          icon: CreditCard
+        });
+      }
       items.push({
         id: 'qr_requests',
         label: 'QR Add Money',

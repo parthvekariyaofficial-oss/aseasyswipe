@@ -19,6 +19,7 @@ import {
   Sliders,
   DollarSign
 } from 'lucide-react';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export const AdminBillRequestsManagement: React.FC = () => {
   const [requests, setRequests] = useState<CreditCardBillRequest[]>([]);
@@ -40,6 +41,11 @@ export const AdminBillRequestsManagement: React.FC = () => {
   const [maxAmount, setMaxAmount] = useState('');
   const [chargeAmount, setChargeAmount] = useState('');
 
+  // Settings Toggle State
+  const { ccBillPayEnabled, toggleCcBillPay, fetchSettings: fetchCcSettings } = useSettingsStore();
+  const [isTogglingCc, setIsTogglingCc] = useState(false);
+  const [toggleNotice, setToggleNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   // Notifications
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,6 +54,7 @@ export const AdminBillRequestsManagement: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
+      fetchCcSettings();
       const [reqRes, slabRes] = await Promise.all([
         billRequestApi.getRequests().catch(() => ({ success: false, requests: [] })),
         billRequestApi.getSlabs().catch(() => ({ success: false, slabs: [] }))
@@ -158,6 +165,34 @@ export const AdminBillRequestsManagement: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleToggleCc = async () => {
+    setIsTogglingCc(true);
+    setToggleNotice(null);
+    try {
+      const res = await toggleCcBillPay();
+      if (res.success) {
+        setToggleNotice({
+          type: 'success',
+          message: res.enabled 
+            ? '✅ Credit Card Bill Pay enabled! User panel menu is now VISIBLE and route is ACCESSIBLE.' 
+            : '🔒 Credit Card Bill Pay disabled! User panel menu is now HIDDEN and direct route URL is BLOCKED.'
+        });
+      } else {
+        setToggleNotice({
+          type: 'error',
+          message: res.message || 'Failed to update Credit Card Bill Pay toggle.'
+        });
+      }
+    } catch (err: any) {
+      setToggleNotice({
+        type: 'error',
+        message: err.message || 'An unexpected error occurred while toggling Credit Card Bill Pay.'
+      });
+    } finally {
+      setIsTogglingCc(false);
+    }
+  };
+
   const filteredRequests = requests.filter(req => {
     const matchesSearch =
       req.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -180,16 +215,103 @@ export const AdminBillRequestsManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Top Action Bar */}
-      <div className="flex items-center justify-end">
-        <button
-          onClick={() => setIsSlabModalOpen(true)}
-          className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-indigo-300 hover:text-white font-bold text-xs transition shadow-sm"
-        >
-          <Sliders className="w-4 h-4 text-indigo-400" />
-          <span>Charge Slabs ({slabs.length})</span>
-        </button>
+      {/* Top Header & Action Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                CC Bill Payment Requests & Control
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                Review offline Credit Card bill payments and control Retailer panel CC Bill Pay menu & route access
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Actions: Slabs Button & Toggle Switch in Top Right Corner */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setIsSlabModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-indigo-300 hover:text-white font-bold text-xs transition shadow-sm cursor-pointer"
+          >
+            <Sliders className="w-4 h-4 text-indigo-400" />
+            <span>Charge Slabs ({slabs.length})</span>
+          </button>
+
+          {/* TOP RIGHT CORNER: CC BILL PAY TOGGLE SWITCH */}
+          <div className="flex items-center gap-3.5 bg-slate-950/80 border border-slate-800/80 px-4 py-2 rounded-2xl shadow-inner">
+            <div className="text-right">
+              <div className="flex items-center gap-1.5 justify-end">
+                <CreditCard className={`w-3.5 h-3.5 ${ccBillPayEnabled ? 'text-emerald-400' : 'text-slate-500'}`} />
+                <span className="text-xs font-black text-white">CC Bill Pay Menu</span>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                  ccBillPayEnabled 
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                }`}>
+                  {ccBillPayEnabled ? 'ACTIVE / VISIBLE' : 'OFF / BLOCKED'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {ccBillPayEnabled 
+                  ? 'User menu is visible & route accessible' 
+                  : 'User menu is hidden & route URL blocked'}
+              </p>
+            </div>
+
+            {/* TOGGLE BUTTON */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={ccBillPayEnabled}
+              disabled={isTogglingCc}
+              onClick={handleToggleCc}
+              className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 shadow-inner ${
+                ccBillPayEnabled ? 'bg-emerald-600 justify-end' : 'bg-slate-800 justify-start'
+              } ${isTogglingCc ? 'opacity-70 cursor-not-allowed' : ''}`}
+              title={ccBillPayEnabled ? 'Click to Turn OFF CC Bill Pay on User Panel' : 'Click to Turn ON CC Bill Pay on User Panel'}
+            >
+              <span
+                className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-all duration-300 flex items-center justify-center`}
+              >
+                {isTogglingCc ? (
+                  <RefreshCw className="w-3 h-3 text-slate-700 animate-spin" />
+                ) : ccBillPayEnabled ? (
+                  <Check className="w-3 h-3 text-emerald-600 font-bold" />
+                ) : (
+                  <X className="w-3 h-3 text-slate-500" />
+                )}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* FEEDBACK ALERT */}
+      {toggleNotice && (
+        <div className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs font-semibold animate-in slide-in-from-top-2 ${
+          toggleNotice.type === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            {toggleNotice.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span>{toggleNotice.message}</span>
+          </div>
+          <button onClick={() => setToggleNotice(null)} className="text-slate-400 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Notifications */}
       {successMessage && (

@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
     qr_request_section_enabled BOOLEAN DEFAULT true,
     live_bill_pay_enabled BOOLEAN DEFAULT true,
     instant_payout_enabled BOOLEAN DEFAULT true,
+    cc_bill_pay_enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -102,9 +103,12 @@ ADD COLUMN IF NOT EXISTS live_bill_pay_enabled BOOLEAN DEFAULT true;
 ALTER TABLE public.system_settings 
 ADD COLUMN IF NOT EXISTS instant_payout_enabled BOOLEAN DEFAULT true;
 
+ALTER TABLE public.system_settings 
+ADD COLUMN IF NOT EXISTS cc_bill_pay_enabled BOOLEAN DEFAULT true;
+
 -- Insert default control settings row ONLY IF NOT EXISTS
-INSERT INTO public.system_settings (id, user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled, instant_payout_enabled)
-VALUES ('qr_controls', true, true, true, true)
+INSERT INTO public.system_settings (id, user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled, instant_payout_enabled, cc_bill_pay_enabled)
+VALUES ('qr_controls', true, true, true, true, true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. BANK ACCOUNTS TABLE (Bank Entry Management)

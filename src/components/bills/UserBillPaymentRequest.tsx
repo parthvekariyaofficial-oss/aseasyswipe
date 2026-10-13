@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { bankApi, billRequestApi, userApi } from '../../services/api';
 import type { BankAccount } from '../../types/bank';
 import type { ChargeSlab, CreditCardBillRequest } from '../../types/billRequest';
@@ -18,11 +19,13 @@ import {
   RefreshCw,
   X,
   AlertTriangle,
+  AlertCircle,
   Info
 } from 'lucide-react';
 
 export const UserBillPaymentRequest: React.FC = () => {
   const { user, updateUser } = useAuthStore();
+  const { ccBillPayEnabled } = useSettingsStore();
   
   // Data lists
   const [banks, setBanks] = useState<BankAccount[]>([]);
@@ -195,6 +198,31 @@ export const UserBillPaymentRequest: React.FC = () => {
 
   const numAmt = Number(amount) || 0;
   const totalDeduction = numAmt + calculatedCharge;
+
+  if (!ccBillPayEnabled) {
+    return (
+      <div className="w-full max-w-xl mx-auto my-12 p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-2xl animate-in fade-in duration-300">
+        <div className="w-16 h-16 mx-auto rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-white">Credit Card Bill Pay Disabled</h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Credit Card Bill Payment service has been temporarily disabled by the administrator. 
+            Access to this feature and route is currently restricted.
+          </p>
+        </div>
+        <div className="pt-2">
+          <button
+            onClick={() => window.location.href = '/users'}
+            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition border border-slate-700 shadow-md"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 w-full pb-10">

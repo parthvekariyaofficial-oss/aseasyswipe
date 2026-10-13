@@ -29,7 +29,7 @@ import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
 
 export default function App() {
   const { user, isAuthenticated, logout, updateUser, sessionRemainingSeconds } = useAuthStore();
-  const { liveBillPayEnabled, instantPayoutEnabled, fetchSettings } = useSettingsStore();
+  const { liveBillPayEnabled, instantPayoutEnabled, ccBillPayEnabled, fetchSettings } = useSettingsStore();
   const getTabFromPath = (path: string, role?: string): string => {
     const p = path.toLowerCase().trim();
     if (p.includes('admin-statement') || p.includes('admin_statement')) return 'admin_statement';
@@ -49,7 +49,10 @@ export default function App() {
       }
       return role === 'admin' ? 'live_bill_history' : 'users';
     }
-    if (p.includes('bill-request') || p.includes('bill_request')) return 'bill_request';
+    if (p.includes('bill-request') || p.includes('bill_request')) {
+      if (role === 'admin') return 'admin_bill_requests';
+      return ccBillPayEnabled ? 'bill_request' : 'users';
+    }
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
     if (p.includes('qr-requests') || p.includes('qr_requests')) return 'qr_requests';
     if (p.includes('users')) return 'users';
@@ -130,12 +133,24 @@ export default function App() {
     }
   }, [user?.role, instantPayoutEnabled, activeTab]);
 
+  // Guard direct URL / tab navigation if CC Bill Pay is disabled for users
+  useEffect(() => {
+    if (user?.role !== 'admin' && !ccBillPayEnabled && activeTab === 'bill_request') {
+      setActiveTabState('users');
+      setCurrentPath('/users');
+      window.history.replaceState({ tab: 'users' }, '', '/users');
+    }
+  }, [user?.role, ccBillPayEnabled, activeTab]);
+
   const handleTabChange = (tabId: string) => {
     let finalTab = tabId;
     if (user?.role === 'user' && !liveBillPayEnabled && tabId === 'live_bill_pay') {
       finalTab = 'users';
     }
     if (user?.role !== 'admin' && !instantPayoutEnabled && tabId === 'payout_transfer') {
+      finalTab = 'users';
+    }
+    if (user?.role !== 'admin' && !ccBillPayEnabled && tabId === 'bill_request') {
       finalTab = 'users';
     }
     setActiveTabState(finalTab);
@@ -464,7 +479,9 @@ export default function App() {
               user.role === 'admin' ? <AdminLiveBillPayHistory /> : renderDashboardByRole(user.role)
             )
           )}
-          {activeTab === 'bill_request' && <UserBillPaymentRequest />}
+          {activeTab === 'bill_request' && (
+            ccBillPayEnabled ? <UserBillPaymentRequest /> : renderDashboardByRole(user.role)
+          )}
           {activeTab === 'qr_master' && <QRMasterManagement />}
           {activeTab === 'qr_requests' && <QRPaymentRequests />}
           {activeTab === 'users' && renderDashboardByRole(user.role)}

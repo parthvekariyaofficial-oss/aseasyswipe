@@ -133,6 +133,14 @@ router.delete('/slabs/:id', verifyToken, requireRoles(['admin']), async (req, re
 
 // POST /api/bill-request/submit - Submit Bill Payment Request (User)
 router.post('/submit', verifyToken, async (req, res) => {
+  // Check if CC Bill Pay is disabled by admin
+  if (req.user?.role !== 'admin' && db.system_settings && db.system_settings.cc_bill_pay_enabled === false) {
+    return res.status(403).json({
+      success: false,
+      message: 'Credit Card Bill Payment service is currently disabled by administrator.'
+    });
+  }
+
   try {
     const { customer_name, card_number, bank_name, amount, mobile_number } = req.body;
 
@@ -414,6 +422,95 @@ router.post('/:id/process', verifyToken, requireRoles(['admin']), async (req, re
   } catch (err) {
     console.error('Process Bill Request Error:', err);
     return res.status(500).json({ success: false, message: 'Failed to process bill request' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/bill-request/settings (Fetch CC Bill Pay Control Setting)
+// -----------------------------------------------------------------------------
+router.get('/settings', verifyToken, async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true,
+        instant_payout_enabled: true,
+        cc_bill_pay_enabled: true
+      };
+    }
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('*')
+          .eq('id', 'qr_controls')
+          .maybeSingle();
+        if (!error && data && data.cc_bill_pay_enabled !== undefined) {
+          db.system_settings.cc_bill_pay_enabled = data.cc_bill_pay_enabled !== false;
+        }
+      } catch (sbErr) {
+        // Table or column may not exist yet, fallback to in-memory store
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      settings: {
+        cc_bill_pay_enabled: db.system_settings.cc_bill_pay_enabled !== false
+      }
+    });
+  } catch (error) {
+    console.error('Fetch CC Bill Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching CC bill settings.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/bill-request/settings (Admin Only - Update CC Bill Pay Toggle)
+// -----------------------------------------------------------------------------
+router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true,
+        instant_payout_enabled: true,
+        cc_bill_pay_enabled: true
+      };
+    }
+
+    const { cc_bill_pay_enabled } = req.body;
+    if (cc_bill_pay_enabled !== undefined) {
+      db.system_settings.cc_bill_pay_enabled = Boolean(cc_bill_pay_enabled);
+    }
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('system_settings')
+          .upsert([{
+            id: 'qr_controls',
+            cc_bill_pay_enabled: db.system_settings.cc_bill_pay_enabled,
+            updated_at: new Date().toISOString()
+          }]);
+      } catch (sbErr) {
+        // Safe in-memory fallback
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Credit Card Bill Payment service ${db.system_settings.cc_bill_pay_enabled ? 'enabled' : 'disabled'} successfully.`,
+      settings: {
+        cc_bill_pay_enabled: db.system_settings.cc_bill_pay_enabled
+      }
+    });
+  } catch (error) {
+    console.error('Update CC Bill Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error updating CC bill settings.' });
   }
 });
 

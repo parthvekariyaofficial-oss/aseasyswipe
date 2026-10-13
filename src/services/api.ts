@@ -263,6 +263,16 @@ export const billRequestApi = {
     const response = await apiClient.post(`/bill-request/${id}/process`, { action, rejection_reason });
     return response.data;
   },
+
+  getSettings: async () => {
+    const response = await apiClient.get('/bill-request/settings');
+    return response.data;
+  },
+
+  updateSettings: async (data: { cc_bill_pay_enabled: boolean }) => {
+    const response = await apiClient.post('/bill-request/settings', data);
+    return response.data;
+  }
 };
 
 export const b2bApi = {
