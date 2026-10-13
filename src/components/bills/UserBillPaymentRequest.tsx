@@ -505,18 +505,42 @@ export const UserBillPaymentRequest: React.FC = () => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] uppercase tracking-wider font-extrabold text-slate-400">
+                  <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Customer & Card</th>
                   <th className="py-3 px-4">Bank</th>
                   <th className="py-3 px-4">Bill Amount</th>
                   <th className="py-3 px-4">Charge</th>
                   <th className="py-3 px-4">Total Debited</th>
                   <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4">Date & Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {requests.map(req => (
                   <tr key={req.id} className="hover:bg-slate-800/40 transition">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {req.created_at ? (
+                        <div className="flex flex-col font-mono text-[11px]">
+                          <span className="font-bold text-slate-200">
+                            {new Date(req.created_at).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(req.created_at).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
+                    </td>
+
                     <td className="py-3.5 px-4">
                       <p className="font-bold text-white">{req.customer_name}</p>
                       <p className="text-[11px] font-mono text-indigo-400">
@@ -557,30 +581,6 @@ export const UserBillPaymentRequest: React.FC = () => {
                         <p className="text-[9px] text-rose-400 mt-1 max-w-[140px] truncate mx-auto">
                           Reason: {req.rejection_reason}
                         </p>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      {req.created_at ? (
-                        <div className="flex flex-col font-mono text-[11px]">
-                          <span className="font-bold text-slate-200">
-                            {new Date(req.created_at).toLocaleDateString('en-IN', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {new Date(req.created_at).toLocaleTimeString('en-IN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500 font-mono text-xs">N/A</span>
                       )}
                     </td>
                   </tr>

@@ -529,6 +529,7 @@ export const QRPaymentRequests: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950 text-slate-400 uppercase font-bold text-[10px] border-b border-slate-800">
               <tr>
+                <th className="p-4">Date & Time</th>
                 <th className="p-4">User & Firm</th>
                 <th className="p-4">Mobile Number</th>
                 <th className="p-4">QR Name</th>
@@ -540,7 +541,6 @@ export const QRPaymentRequests: React.FC = () => {
                 {isAdmin && <th className="p-4 text-emerald-400">Admin Comm</th>}
                 <th className="p-4">Net Credit</th>
                 <th className="p-4">Status</th>
-                <th className="p-4">Date & Time</th>
                 <th className="p-4 text-right">Actions / Verification</th>
               </tr>
             </thead>
@@ -561,6 +561,31 @@ export const QRPaymentRequests: React.FC = () => {
                 (isAdmin ? filteredRequests : requestsList).map((r) => (
                   <tr key={r.id} className="hover:bg-slate-800/40 transition">
                     
+                    {/* DATE & TIME (1ST COLUMN) */}
+                    <td className="p-4 whitespace-nowrap">
+                      {r.created_at ? (
+                        <div className="flex flex-col font-mono text-[11px]">
+                          <span className="font-bold text-slate-200">
+                            {new Date(r.created_at).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(r.created_at).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
+                    </td>
+
                     {/* USER & FIRM */}
                     <td className="p-4">
                       <div>
@@ -638,31 +663,6 @@ export const QRPaymentRequests: React.FC = () => {
                         {r.status === 'pending' && <Clock className="w-3 h-3 animate-spin" />}
                         <span className="uppercase">{r.status}</span>
                       </span>
-                    </td>
-
-                    {/* DATE & TIME */}
-                    <td className="p-4 whitespace-nowrap">
-                      {r.created_at ? (
-                        <div className="flex flex-col font-mono text-[11px]">
-                          <span className="font-bold text-slate-200">
-                            {new Date(r.created_at).toLocaleDateString('en-IN', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {new Date(r.created_at).toLocaleTimeString('en-IN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500 font-mono text-xs">N/A</span>
-                      )}
                     </td>
 
                     {/* ACTIONS */}
