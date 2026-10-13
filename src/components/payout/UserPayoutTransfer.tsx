@@ -6,7 +6,8 @@ import { PayoutReceiptModal } from './PayoutReceiptModal';
 import {
   Wallet, ArrowRightLeft, ShieldCheck, CheckCircle2,
   Clock, AlertTriangle, Building2, User, Hash, Lock,
-  RefreshCw, Check, Copy, ExternalLink, Zap, AlertCircle
+  RefreshCw, Check, Copy, ExternalLink, Zap, AlertCircle,
+  Calendar, Search, Filter, RotateCcw, X
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -44,6 +45,92 @@ export const UserPayoutTransfer: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
   const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
+
+  // History Filter State
+  const [historySearchTerm, setHistorySearchTerm] = useState<string>('');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>('all');
+  const [historyDateFilter, setHistoryDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [historyCustomStartDate, setHistoryCustomStartDate] = useState<string>('');
+  const [historyCustomEndDate, setHistoryCustomEndDate] = useState<string>('');
+
+  const isAnyHistoryFilterActive = Boolean(
+    historySearchTerm.trim() ||
+    historyStatusFilter !== 'all' ||
+    historyDateFilter !== 'ALL' ||
+    historyCustomStartDate ||
+    historyCustomEndDate
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistorySearchTerm('');
+    setHistoryStatusFilter('all');
+    setHistoryDateFilter('ALL');
+    setHistoryCustomStartDate('');
+    setHistoryCustomEndDate('');
+  };
+
+  const filteredHistory = history.filter((item) => {
+    // 1. Date Filter
+    if (historyDateFilter !== 'ALL') {
+      if (!item.created_at) return false;
+      const d = new Date(item.created_at);
+      const time = d.getTime();
+      if (isNaN(time)) return false;
+
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+      if (historyDateFilter === 'TODAY') {
+        if (time < startOfToday || time > endOfToday) return false;
+      } else if (historyDateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (time < startOfYesterday || time > endOfYesterday) return false;
+      } else if (historyDateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (time < startOf7Days || time > endOfToday) return false;
+      } else if (historyDateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (time < startOf30Days || time > endOfToday) return false;
+      } else if (historyDateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (time < startOfMonth || time > endOfToday) return false;
+      } else if (historyDateFilter === 'CUSTOM') {
+        if (historyCustomStartDate) {
+          const [sY, sM, sD] = historyCustomStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (time < startTime) return false;
+        }
+        if (historyCustomEndDate) {
+          const [eY, eM, eD] = historyCustomEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (time > endTime) return false;
+        }
+      }
+    }
+
+    // 2. Status Filter
+    const matchesStatus = historyStatusFilter === 'all' || item.status === historyStatusFilter;
+    if (!matchesStatus) return false;
+
+    // 3. Search Query
+    if (historySearchTerm.trim()) {
+      const q = historySearchTerm.trim().toLowerCase();
+      const matchesSearch =
+        (item.client_order_id || '').toLowerCase().includes(q) ||
+        (item.utr || '').toLowerCase().includes(q) ||
+        (item.beneficiary_name || '').toLowerCase().includes(q) ||
+        (item.account_number || '').includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    return true;
+  });
+
+  const successHistoryCount = history.filter(t => t.status === 'success').length;
+  const pendingHistoryCount = history.filter(t => t.status === 'pending').length;
+  const failedHistoryCount = history.filter(t => t.status === 'failed').length;
 
   // Debounced live calculation when amount changes
   useEffect(() => {
@@ -583,16 +670,108 @@ export const UserPayoutTransfer: React.FC = () => {
             <div>
               <h2 className="text-lg font-black text-white flex items-center gap-2">
                 <Clock className="w-5 h-5 text-indigo-400" /> My Payout Transfer Records
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                  {filteredHistory.length}{filteredHistory.length !== history.length ? ` / ${history.length}` : ''}
+                </span>
               </h2>
               <p className="text-xs text-slate-400">Complete real-time log of your bank transfers with bank UTRs</p>
             </div>
-            <button
-              onClick={fetchHistory}
-              disabled={historyLoading}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors self-start sm:self-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} /> Refresh Log
-            </button>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {isAnyHistoryFilterActive && (
+                <button
+                  type="button"
+                  onClick={handleClearHistoryFilters}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Clear Filters
+                </button>
+              )}
+
+              <button
+                onClick={fetchHistory}
+                disabled={historyLoading}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? 'animate-spin' : ''}`} /> Refresh Log
+              </button>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={historySearchTerm}
+                onChange={(e) => setHistorySearchTerm(e.target.value)}
+                placeholder="Search order ref, UTR, account..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none placeholder-slate-500"
+              />
+              {historySearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setHistorySearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Date Range Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+              <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+              <select
+                value={historyDateFilter}
+                onChange={(e) => setHistoryDateFilter(e.target.value as any)}
+                className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
+              >
+                <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+                <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+                <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+                <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+                <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+                <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+                <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+              </select>
+            </div>
+
+            {/* Custom Date Inputs */}
+            {historyDateFilter === 'CUSTOM' && (
+              <div className="flex items-center gap-2 bg-slate-950 border border-indigo-500/40 rounded-xl px-3 py-1.5 text-xs">
+                <span className="text-[11px] text-slate-400 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={historyCustomStartDate}
+                  onChange={(e) => setHistoryCustomStartDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+                />
+                <span className="text-[11px] text-slate-400 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={historyCustomEndDate}
+                  onChange={(e) => setHistoryCustomEndDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+                />
+              </div>
+            )}
+
+            {/* Status Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+              <select
+                value={historyStatusFilter}
+                onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer font-medium"
+              >
+                <option value="all" className="bg-slate-900 text-slate-200">All Status ({history.length})</option>
+                <option value="success" className="bg-slate-900 text-slate-200">Success ({successHistoryCount})</option>
+                <option value="pending" className="bg-slate-900 text-slate-200">Pending ({pendingHistoryCount})</option>
+                <option value="failed" className="bg-slate-900 text-slate-200">Failed / Refunded ({failedHistoryCount})</option>
+              </select>
+            </div>
           </div>
 
           {historyLoading ? (
@@ -600,11 +779,11 @@ export const UserPayoutTransfer: React.FC = () => {
               <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
               Loading payout history...
             </div>
-          ) : history.length === 0 ? (
+          ) : filteredHistory.length === 0 ? (
             <div className="py-16 text-center text-slate-400 text-xs space-y-2">
               <Building2 className="w-8 h-8 text-slate-600 mx-auto" />
-              <p className="font-bold text-slate-300">No payout transfers found</p>
-              <p className="text-[11px] text-slate-500">You have not submitted any bank transfers yet.</p>
+              <p className="font-bold text-slate-300">No matching transfers found</p>
+              <p className="text-[11px] text-slate-500">Try adjusting your search or date range filters.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -623,7 +802,7 @@ export const UserPayoutTransfer: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {history.map((item) => (
+                  {filteredHistory.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="py-3 px-4 whitespace-nowrap text-slate-400 font-mono text-[11px]">
                         {new Date(item.created_at).toLocaleString('en-IN', {
