@@ -6,7 +6,7 @@ import type {
 } from '../../types/b2b';
 import { 
   CreditCard, Search, ShieldCheck, CheckCircle2, Clock, AlertCircle, ArrowRight, 
-  RefreshCw, FileText, Lock, ChevronDown
+  RefreshCw, FileText, Lock, ChevronDown, Calendar, Filter, RotateCcw, X
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -59,6 +59,100 @@ export const LiveBillPayment: React.FC = () => {
   // History State
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // History Filter State
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'success' | 'pending' | 'failed'>('all');
+  const [historyDateFilter, setHistoryDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [historyCustomStartDate, setHistoryCustomStartDate] = useState('');
+  const [historyCustomEndDate, setHistoryCustomEndDate] = useState('');
+
+  const isAnyHistoryFilterActive = Boolean(
+    historySearchQuery.trim() ||
+    historyStatusFilter !== 'all' ||
+    historyDateFilter !== 'ALL' ||
+    historyCustomStartDate ||
+    historyCustomEndDate
+  );
+
+  const handleClearHistoryFilters = () => {
+    setHistorySearchQuery('');
+    setHistoryStatusFilter('all');
+    setHistoryDateFilter('ALL');
+    setHistoryCustomStartDate('');
+    setHistoryCustomEndDate('');
+  };
+
+  const filteredHistoryList = historyList.filter(item => {
+    // 1. Date Filter
+    if (historyDateFilter !== 'ALL') {
+      if (!item.created_at) return false;
+      const d = new Date(item.created_at);
+      const t = d.getTime();
+      if (isNaN(t)) return false;
+
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+      if (historyDateFilter === 'TODAY') {
+        if (t < startOfToday || t > endOfToday) return false;
+      } else if (historyDateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (t < startOfYesterday || t > endOfYesterday) return false;
+      } else if (historyDateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (t < startOf7Days || t > endOfToday) return false;
+      } else if (historyDateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (t < startOf30Days || t > endOfToday) return false;
+      } else if (historyDateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (t < startOfMonth || t > endOfToday) return false;
+      } else if (historyDateFilter === 'CUSTOM') {
+        if (historyCustomStartDate) {
+          const [sY, sM, sD] = historyCustomStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (t < startTime) return false;
+        }
+        if (historyCustomEndDate) {
+          const [eY, eM, eD] = historyCustomEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (t > endTime) return false;
+        }
+      }
+    }
+
+    // 2. Status Filter
+    const itemStatus = (item.status || '').toLowerCase();
+    const isSuccess = itemStatus === 'success' || itemStatus === 'approved';
+    const isPending = itemStatus === 'pending';
+    const isFailed = itemStatus === 'failed' || itemStatus === 'rejected';
+
+    if (historyStatusFilter === 'success' && !isSuccess) return false;
+    if (historyStatusFilter === 'pending' && !isPending) return false;
+    if (historyStatusFilter === 'failed' && !isFailed) return false;
+
+    // 3. Search Query
+    if (historySearchQuery.trim()) {
+      const q = historySearchQuery.trim().toLowerCase();
+      const matchesSearch = 
+        (item.biller_name || '').toLowerCase().includes(q) ||
+        (item.biller_id || '').toLowerCase().includes(q) ||
+        (item.customer_name || '').toLowerCase().includes(q) ||
+        (item.customer_mobile || '').toLowerCase().includes(q) ||
+        (item.client_transaction_id || '').toLowerCase().includes(q) ||
+        (item.bbps_txn_ref_id || '').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    return true;
+  });
+
+  const successCount = historyList.filter(i => (i.status || '').toLowerCase() === 'success' || (i.status || '').toLowerCase() === 'approved').length;
+  const pendingCount = historyList.filter(i => (i.status || '').toLowerCase() === 'pending').length;
+  const failedCount = historyList.filter(i => (i.status || '').toLowerCase() === 'failed' || (i.status || '').toLowerCase() === 'rejected').length;
 
   const loadHistory = async () => {
     setLoadingHistory(true);
@@ -592,28 +686,124 @@ export const LiveBillPayment: React.FC = () => {
       </div>
 
       {/* RECENT CREDIT CARD BILL PAYMENTS HISTORY TABLE */}
+      {/* HISTORY TABLE WITH FILTERS */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-white">Credit Card Bill Payment History</h2>
+              <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                Credit Card Bill Payment History
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                  {filteredHistoryList.length}{filteredHistoryList.length !== historyList.length ? ` / ${historyList.length}` : ''}
+                </span>
+              </h2>
               <p className="text-xs text-slate-400 mt-0.5">Real-time record of all initiated and completed BBPS credit card payments</p>
             </div>
           </div>
-          <button
-            onClick={loadHistory}
-            disabled={loadingHistory}
-            className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            {isAnyHistoryFilterActive && (
+              <button
+                type="button"
+                onClick={handleClearHistoryFilters}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Clear Filters
+              </button>
+            )}
+
+            <button
+              onClick={loadHistory}
+              disabled={loadingHistory}
+              className="p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
 
-        {historyList.length > 0 ? (
+        {/* FILTER CONTROLS */}
+        <div className="flex flex-wrap items-center gap-2.5 pb-2">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search Biller / Customer / Mobile / Txn ID..."
+              value={historySearchQuery}
+              onChange={(e) => setHistorySearchQuery(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+            {historySearchQuery && (
+              <button
+                type="button"
+                onClick={() => setHistorySearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Range Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+            <select
+              value={historyDateFilter}
+              onChange={(e) => setHistoryDateFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
+            >
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+              <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+              <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+            </select>
+          </div>
+
+          {/* Custom Date Inputs */}
+          {historyDateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-indigo-500/40 rounded-xl px-3 py-1.5 text-xs">
+              <span className="text-[11px] text-slate-400 font-medium">From:</span>
+              <input
+                type="date"
+                value={historyCustomStartDate}
+                onChange={(e) => setHistoryCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+              <span className="text-[11px] text-slate-400 font-medium">To:</span>
+              <input
+                type="date"
+                value={historyCustomEndDate}
+                onChange={(e) => setHistoryCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+          )}
+
+          {/* Status Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <select
+              value={historyStatusFilter}
+              onChange={(e) => setHistoryStatusFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer font-medium"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">All Records ({historyList.length})</option>
+              <option value="success" className="bg-slate-900 text-slate-200">Success ({successCount})</option>
+              <option value="pending" className="bg-slate-900 text-slate-200">Pending ({pendingCount})</option>
+              <option value="failed" className="bg-slate-900 text-slate-200">Failed ({failedCount})</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredHistoryList.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-[10px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-800">
@@ -629,7 +819,7 @@ export const LiveBillPayment: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {historyList.map((item, idx) => (
+                {filteredHistoryList.map((item, idx) => (
                   <tr key={item.client_transaction_id || item.id || idx} className="hover:bg-slate-800/30 transition">
                     <td className="p-3.5 text-slate-400 font-sans">
                       {new Date(item.created_at || Date.now()).toLocaleString('en-IN', {

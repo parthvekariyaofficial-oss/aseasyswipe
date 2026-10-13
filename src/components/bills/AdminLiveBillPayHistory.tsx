@@ -3,7 +3,7 @@ import { b2bApi } from '../../services/api';
 import { 
   Clock, Search, RefreshCw, CheckCircle2, AlertCircle, 
   Receipt, Landmark, ShieldCheck, UserCheck, ArrowUpRight,
-  X, RotateCcw, Activity, Zap, Check
+  X, RotateCcw, Activity, Zap, Check, Calendar, Filter
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -12,6 +12,9 @@ export const AdminLiveBillPayHistory: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'pending' | 'failed'>('all');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'LAST_30_DAYS' | 'THIS_MONTH' | 'CUSTOM'>('ALL');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
   const [statusModal, setStatusModal] = useState<{
     item: any;
@@ -94,26 +97,89 @@ export const AdminLiveBillPayHistory: React.FC = () => {
     }
   };
 
+  const isAnyFilterActive = Boolean(
+    searchQuery.trim() ||
+    statusFilter !== 'all' ||
+    dateFilter !== 'ALL' ||
+    customStartDate ||
+    customEndDate
+  );
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDateFilter('ALL');
+    setCustomStartDate('');
+    setCustomEndDate('');
+  };
+
   // Filter Logic
   const filteredHistory = historyList.filter(item => {
-    const matchesSearch = 
-      (item.biller_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.biller_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.customer_mobile || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.client_transaction_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.bbps_txn_ref_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.user_id || '').toLowerCase().includes(searchQuery.toLowerCase());
+    // 1. Date Filter
+    if (dateFilter !== 'ALL') {
+      if (!item.created_at) return false;
+      const d = new Date(item.created_at);
+      const t = d.getTime();
+      if (isNaN(t)) return false;
 
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+      if (dateFilter === 'TODAY') {
+        if (t < startOfToday || t > endOfToday) return false;
+      } else if (dateFilter === 'YESTERDAY') {
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const endOfYesterday = startOfToday - 1;
+        if (t < startOfYesterday || t > endOfYesterday) return false;
+      } else if (dateFilter === 'LAST_7_DAYS') {
+        const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+        if (t < startOf7Days || t > endOfToday) return false;
+      } else if (dateFilter === 'LAST_30_DAYS') {
+        const startOf30Days = startOfToday - 29 * 24 * 60 * 60 * 1000;
+        if (t < startOf30Days || t > endOfToday) return false;
+      } else if (dateFilter === 'THIS_MONTH') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+        if (t < startOfMonth || t > endOfToday) return false;
+      } else if (dateFilter === 'CUSTOM') {
+        if (customStartDate) {
+          const [sY, sM, sD] = customStartDate.split('-').map(Number);
+          const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+          if (t < startTime) return false;
+        }
+        if (customEndDate) {
+          const [eY, eM, eD] = customEndDate.split('-').map(Number);
+          const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+          if (t > endTime) return false;
+        }
+      }
+    }
+
+    // 2. Status Filter
     const itemStatus = (item.status || '').toLowerCase();
     const isSuccess = itemStatus === 'success' || itemStatus === 'approved';
     const isPending = itemStatus === 'pending';
     const isFailed = itemStatus === 'failed' || itemStatus === 'rejected';
 
-    if (statusFilter === 'success') return matchesSearch && isSuccess;
-    if (statusFilter === 'pending') return matchesSearch && isPending;
-    if (statusFilter === 'failed') return matchesSearch && isFailed;
-    return matchesSearch;
+    if (statusFilter === 'success' && !isSuccess) return false;
+    if (statusFilter === 'pending' && !isPending) return false;
+    if (statusFilter === 'failed' && !isFailed) return false;
+
+    // 3. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = 
+        (item.biller_name || '').toLowerCase().includes(q) ||
+        (item.biller_id || '').toLowerCase().includes(q) ||
+        (item.customer_name || '').toLowerCase().includes(q) ||
+        (item.customer_mobile || '').toLowerCase().includes(q) ||
+        (item.client_transaction_id || '').toLowerCase().includes(q) ||
+        (item.bbps_txn_ref_id || '').toLowerCase().includes(q) ||
+        (item.user_id || '').toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    return true;
   });
 
   // Calculate Metrics
@@ -276,64 +342,102 @@ export const AdminLiveBillPayHistory: React.FC = () => {
 
       {/* SEARCH & FILTER BAR */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-purple-400" />
+            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
+              Filter Records
+            </span>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+              {filteredHistory.length}{filteredHistory.length !== historyList.length ? ` / ${historyList.length}` : ''}
+            </span>
+          </div>
+
+          {isAnyFilterActive && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-semibold transition"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Clear Filters
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* SEARCH BOX */}
-          <div className="relative w-full md:w-96">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search User / Mobile / Biller / Txn ID / Ref ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* STATUS FILTER PILLS */}
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                statusFilter === 'all'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-              }`}
+          {/* DATE RANGE DROPDOWN */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-2 font-medium"
             >
-              All Records ({historyList.length})
-            </button>
-            <button
-              onClick={() => setStatusFilter('success')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                statusFilter === 'success'
-                  ? 'bg-emerald-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              Success ({successCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('pending')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                statusFilter === 'pending'
-                  ? 'bg-amber-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              Pending ({pendingCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('failed')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                statusFilter === 'failed'
-                  ? 'bg-rose-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              Failed ({failedCount})
-            </button>
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+              <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+              <option value="LAST_30_DAYS" className="bg-slate-900 text-slate-200">Last 30 Days</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+            </select>
           </div>
 
+          {/* CUSTOM DATE RANGE INPUTS */}
+          {dateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs">
+              <span className="text-[11px] text-slate-400 font-medium">From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+              />
+              <span className="text-[11px] text-slate-400 font-medium">To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+              />
+            </div>
+          )}
+
+          {/* STATUS DROPDOWN (CONVERTED FROM PILL BUTTONS) */}
+          <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer font-medium"
+            >
+              <option value="all" className="bg-slate-900 text-slate-200">All Records ({historyList.length})</option>
+              <option value="success" className="bg-slate-900 text-slate-200">Success ({successCount})</option>
+              <option value="pending" className="bg-slate-900 text-slate-200">Pending ({pendingCount})</option>
+              <option value="failed" className="bg-slate-900 text-slate-200">Failed ({failedCount})</option>
+            </select>
+          </div>
         </div>
       </div>
 
