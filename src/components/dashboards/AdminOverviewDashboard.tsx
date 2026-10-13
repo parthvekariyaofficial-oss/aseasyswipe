@@ -8,7 +8,7 @@ import { UsePayBalanceWidget } from './UsePayBalanceWidget';
 import { 
   CheckCircle2, ShieldCheck, Users, Building2, Wallet, 
   ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt,
-  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter
+  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, CircleDollarSign
 } from 'lucide-react';
 
 export const AdminOverviewDashboard: React.FC = () => {
@@ -160,6 +160,9 @@ export const AdminOverviewDashboard: React.FC = () => {
   // 8. Total Payout Charges
   const totalPayoutCharges = successfulPayouts.reduce((acc, t) => acc + Number(t.slab_charge || 0), 0);
 
+  // 9. Total Combined Platform Charges (Admin QR Commission + CC Bill Charges + Payout Charges)
+  const totalCombinedCharges = totalAdminCommission + totalBillServiceCharge + totalPayoutCharges;
+
   // Platform wallet stats
   const totalSystemBalance = usersList.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
   const activeUserCount = usersList.filter(u => u.status === 'Active').length;
@@ -260,7 +263,7 @@ export const AdminOverviewDashboard: React.FC = () => {
       <UsePayBalanceWidget />
 
       {/* ALL PRIMARY STAT CARDS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
 
         {/* CARD 1: TOTAL APPROVED QR AMOUNT */}
         <div className="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 relative overflow-hidden shadow-xl hover:border-emerald-500/50 transition group">
@@ -427,6 +430,42 @@ export const AdminOverviewDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 mt-3 text-[11px] text-teal-300/80 font-medium">
             <Coins className="w-3.5 h-3.5 text-teal-400" />
             <span>Instant Transfer Slabs Revenue</span>
+          </div>
+        </div>
+
+        {/* CARD 9: TOTAL CHARGES (ADMIN QR COMMISSION + CC BILL CHARGES + PAYOUT CHARGES) */}
+        <div className="bg-gradient-to-br from-violet-950/80 via-slate-900 to-slate-900 border border-violet-500/40 rounded-3xl p-6 relative overflow-hidden shadow-2xl hover:border-violet-500/60 transition group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-violet-500/20 transition" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] uppercase font-extrabold text-violet-300 tracking-wider">Total Charges</span>
+            <div className="p-3 rounded-2xl bg-violet-500/20 border border-violet-500/40 text-violet-300">
+              <CircleDollarSign className="w-6 h-6" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-white font-mono">
+            ₹{totalCombinedCharges.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+
+          {/* 3-WAY BREAKDOWN: QR + CC + PAYOUT */}
+          <div className="mt-4 pt-3 border-t border-violet-500/20 grid grid-cols-3 gap-1.5 text-[10px]">
+            <div className="bg-slate-950/60 p-2 rounded-xl border border-violet-500/20 text-center">
+              <p className="text-[9px] uppercase font-extrabold text-slate-400 truncate">QR Comm</p>
+              <p className="font-bold font-mono text-indigo-300 mt-0.5 truncate">
+                ₹{totalAdminCommission.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-slate-950/60 p-2 rounded-xl border border-violet-500/20 text-center">
+              <p className="text-[9px] uppercase font-extrabold text-slate-400 truncate">CC Bill</p>
+              <p className="font-bold font-mono text-pink-300 mt-0.5 truncate">
+                ₹{totalBillServiceCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-slate-950/60 p-2 rounded-xl border border-violet-500/20 text-center">
+              <p className="text-[9px] uppercase font-extrabold text-slate-400 truncate">Payout</p>
+              <p className="font-bold font-mono text-teal-300 mt-0.5 truncate">
+                ₹{totalPayoutCharges.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
           </div>
         </div>
 
