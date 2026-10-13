@@ -174,8 +174,8 @@ export const AdminBillRequestsManagement: React.FC = () => {
         setToggleNotice({
           type: 'success',
           message: res.enabled 
-            ? '✅ Credit Card Bill Pay enabled! User panel menu is now VISIBLE and route is ACCESSIBLE.' 
-            : '🔒 Credit Card Bill Pay disabled! User panel menu is now HIDDEN and direct route URL is BLOCKED.'
+            ? '✅ CC Bill Pay Service is ACTIVE! New request form & charge slabs are now VISIBLE to users.' 
+            : '🔒 CC Bill Pay Service is OFF! New request form & charge slabs are HIDDEN, and "Service Temporarily Off" message is shown to users.'
         });
       } else {
         setToggleNotice({
@@ -248,19 +248,19 @@ export const AdminBillRequestsManagement: React.FC = () => {
             <div className="text-right">
               <div className="flex items-center gap-1.5 justify-end">
                 <CreditCard className={`w-3.5 h-3.5 ${ccBillPayEnabled ? 'text-emerald-400' : 'text-slate-500'}`} />
-                <span className="text-xs font-black text-white">CC Bill Pay Menu</span>
+                <span className="text-xs font-black text-white">New Request & Slabs</span>
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                   ccBillPayEnabled 
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
-                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                 }`}>
-                  {ccBillPayEnabled ? 'ACTIVE / VISIBLE' : 'OFF / BLOCKED'}
+                  {ccBillPayEnabled ? 'ACTIVE / VISIBLE' : 'SERVICE OFF'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
                 {ccBillPayEnabled 
-                  ? 'User menu is visible & route accessible' 
-                  : 'User menu is hidden & route URL blocked'}
+                  ? 'Request form & slabs are visible to users' 
+                  : 'Form & slabs hidden ("Service Temporarily Off" shown)'}
               </p>
             </div>
 

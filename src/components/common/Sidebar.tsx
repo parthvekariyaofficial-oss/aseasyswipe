@@ -138,13 +138,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: Zap
         });
       }
-      if (ccBillPayEnabled) {
-        items.push({
-          id: 'bill_request',
-          label: 'Credit Card Bill Pay',
-          icon: CreditCard
-        });
-      }
+      items.push({
+        id: 'bill_request',
+        label: 'Credit Card Bill Pay',
+        icon: CreditCard
+      });
       items.push({
         id: 'qr_requests',
         label: 'QR Add Money',

@@ -137,7 +137,7 @@ router.post('/submit', verifyToken, async (req, res) => {
   if (req.user?.role !== 'admin' && db.system_settings && db.system_settings.cc_bill_pay_enabled === false) {
     return res.status(403).json({
       success: false,
-      message: 'Credit Card Bill Payment service is currently disabled by administrator.'
+      message: 'Service Temporarily Off: Credit Card Bill Payment service is temporarily disabled by administrator.'
     });
   }
 

@@ -199,31 +199,6 @@ export const UserBillPaymentRequest: React.FC = () => {
   const numAmt = Number(amount) || 0;
   const totalDeduction = numAmt + calculatedCharge;
 
-  if (!ccBillPayEnabled) {
-    return (
-      <div className="w-full max-w-xl mx-auto my-12 p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-2xl animate-in fade-in duration-300">
-        <div className="w-16 h-16 mx-auto rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-xl font-black text-white">Credit Card Bill Pay Disabled</h2>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Credit Card Bill Payment service has been temporarily disabled by the administrator. 
-            Access to this feature and route is currently restricted.
-          </p>
-        </div>
-        <div className="pt-2">
-          <button
-            onClick={() => window.location.href = '/users'}
-            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition border border-slate-700 shadow-md"
-          >
-            Return to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300 w-full pb-10">
       {/* Top Banner & Header */}
@@ -280,7 +255,8 @@ export const UserBillPaymentRequest: React.FC = () => {
       )}
 
       {/* Grid: Request Form (Left) & Active Slabs Info (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {ccBillPayEnabled ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* FORM CONTAINER (8 Columns) */}
         <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
@@ -480,6 +456,30 @@ export const UserBillPaymentRequest: React.FC = () => {
           </div>
         </div>
       </div>
+      ) : (
+        /* SERVICE TEMPORARILY OFF NOTICE CARD */
+        <div className="bg-gradient-to-b from-slate-900/90 to-slate-950 border border-amber-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-2xl backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-16 h-16 mx-auto rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-950/40">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              Service Temporarily Off
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Credit Card Bill Payment Service is Temporarily Off
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
+              New bill payment request submissions and service charge slab calculations are currently disabled by the administrator. Please check back later or contact support.
+            </p>
+          </div>
+          <div className="pt-2 text-[11px] font-semibold text-slate-500 flex items-center justify-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            <span>You can view and track your previous bill payment requests history below.</span>
+          </div>
+        </div>
+      )}
 
       {/* RECENT REQUESTS TABLE */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl space-y-3 p-5">
