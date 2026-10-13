@@ -465,6 +465,7 @@ export const AdminBillRequestsManagement: React.FC = () => {
                   <th className="py-3.5 px-4">Slab Charge</th>
                   <th className="py-3.5 px-4">Total Debited</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -529,6 +530,31 @@ export const AdminBillRequestsManagement: React.FC = () => {
                         {req.status === 'pending' && <Clock className="w-3 h-3 animate-pulse" />}
                         <span>{req.status}</span>
                       </span>
+                    </td>
+
+                    {/* Date & Time */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      {req.created_at ? (
+                        <div className="flex flex-col font-mono text-[11px]">
+                          <span className="font-bold text-slate-200">
+                            {new Date(req.created_at).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(req.created_at).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
                     </td>
 
                     {/* Actions */}

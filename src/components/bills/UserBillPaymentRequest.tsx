@@ -511,7 +511,7 @@ export const UserBillPaymentRequest: React.FC = () => {
                   <th className="py-3 px-4">Charge</th>
                   <th className="py-3 px-4">Total Debited</th>
                   <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Date & Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -560,13 +560,28 @@ export const UserBillPaymentRequest: React.FC = () => {
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 text-slate-400 text-[11px]">
-                      {new Date(req.created_at).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {req.created_at ? (
+                        <div className="flex flex-col font-mono text-[11px]">
+                          <span className="font-bold text-slate-200">
+                            {new Date(req.created_at).toLocaleDateString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(req.created_at).toLocaleTimeString('en-IN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
                     </td>
                   </tr>
                 ))}
