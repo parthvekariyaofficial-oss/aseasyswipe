@@ -94,6 +94,10 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure column exists if table was already created in earlier versions
+ALTER TABLE public.system_settings 
+ADD COLUMN IF NOT EXISTS live_bill_pay_enabled BOOLEAN DEFAULT true;
+
 -- Insert default control settings row ONLY IF NOT EXISTS
 INSERT INTO public.system_settings (id, user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled)
 VALUES ('qr_controls', true, true, true)
