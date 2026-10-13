@@ -8,7 +8,7 @@ import { UsePayBalanceWidget } from './UsePayBalanceWidget';
 import { 
   CheckCircle2, ShieldCheck, Users, Building2, Wallet, 
   ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt,
-  ArrowRightLeft, IndianRupee
+  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter
 } from 'lucide-react';
 
 export const AdminOverviewDashboard: React.FC = () => {
@@ -18,6 +18,11 @@ export const AdminOverviewDashboard: React.FC = () => {
   const [liveHistoryList, setLiveHistoryList] = useState<any[]>([]);
   const [payoutTxnsList, setPayoutTxnsList] = useState<PayoutTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Date Filter State (Default: TODAY)
+  const [dateFilter, setDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL' | 'CUSTOM'>('TODAY');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -56,16 +61,64 @@ export const AdminOverviewDashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Filter approved QR requests
-  const approvedRequests = requestsList.filter(r => r.status === 'approved');
-  const pendingRequests = requestsList.filter(r => r.status === 'pending');
+  // Helper to check if a record matches the selected date filter
+  const isWithinDateFilter = (createdAt?: string | null) => {
+    if (dateFilter === 'ALL') return true;
+    if (!createdAt) return false;
+    const d = new Date(createdAt);
+    const t = d.getTime();
+    if (isNaN(t)) return false;
 
-  // Filter offline bill requests
-  const approvedBillRequests = billRequestsList.filter(r => r.status === 'approved');
-  const pendingBillRequests = billRequestsList.filter(r => r.status === 'pending');
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
 
-  // Filter successful live BBPS payments
-  const successfulLivePayments = liveHistoryList.filter(r => r.status === 'success' || r.status === 'approved');
+    if (dateFilter === 'TODAY') {
+      return t >= startOfToday && t <= endOfToday;
+    } else if (dateFilter === 'YESTERDAY') {
+      const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+      const endOfYesterday = startOfToday - 1;
+      return t >= startOfYesterday && t <= endOfYesterday;
+    } else if (dateFilter === 'LAST_7_DAYS') {
+      const startOf7Days = startOfToday - 6 * 24 * 60 * 60 * 1000;
+      return t >= startOf7Days && t <= endOfToday;
+    } else if (dateFilter === 'THIS_MONTH') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+      return t >= startOfMonth && t <= endOfToday;
+    } else if (dateFilter === 'CUSTOM') {
+      if (customStartDate) {
+        const [sY, sM, sD] = customStartDate.split('-').map(Number);
+        const startTime = new Date(sY, sM - 1, sD, 0, 0, 0, 0).getTime();
+        if (t < startTime) return false;
+      }
+      if (customEndDate) {
+        const [eY, eM, eD] = customEndDate.split('-').map(Number);
+        const endTime = new Date(eY, eM - 1, eD, 23, 59, 59, 999).getTime();
+        if (t > endTime) return false;
+      }
+      return true;
+    }
+    return true;
+  };
+
+  // Filter QR requests with date filter
+  const filteredQrRequests = requestsList.filter(r => isWithinDateFilter(r.created_at));
+  const approvedRequests = filteredQrRequests.filter(r => r.status === 'approved');
+  const pendingRequests = filteredQrRequests.filter(r => r.status === 'pending');
+
+  // Filter offline bill requests with date filter
+  const filteredBillRequests = billRequestsList.filter(r => isWithinDateFilter(r.created_at));
+  const approvedBillRequests = filteredBillRequests.filter(r => r.status === 'approved');
+  const pendingBillRequests = filteredBillRequests.filter(r => r.status === 'pending');
+
+  // Filter live BBPS payments with date filter
+  const filteredLiveHistory = liveHistoryList.filter(r => isWithinDateFilter(r.created_at || r.createdAt || r.date || r.timestamp));
+  const successfulLivePayments = filteredLiveHistory.filter(r => r.status === 'success' || r.status === 'approved');
+
+  // Filter payout transactions with date filter
+  const filteredPayoutTxns = payoutTxnsList.filter(t => isWithinDateFilter(t.created_at || (t as any).createdAt));
+  const successfulPayouts = filteredPayoutTxns.filter(t => t.status === 'success');
+  const pendingPayouts = filteredPayoutTxns.filter(t => t.status === 'pending');
 
   // 1. Total Approved QR Amount
   const totalApprovedAmount = approvedRequests.reduce((acc, r) => acc + Number(r.amount || 0), 0);
@@ -101,10 +154,6 @@ export const AdminOverviewDashboard: React.FC = () => {
   const liveBillVolume = successfulLivePayments.reduce((acc, r) => acc + Number(r.amount || 0), 0);
   const totalApprovedBillAmount = offlineBillVolume + liveBillVolume;
 
-  // Filter successful & pending payout transactions
-  const successfulPayouts = payoutTxnsList.filter(t => t.status === 'success');
-  const pendingPayouts = payoutTxnsList.filter(t => t.status === 'pending');
-
   // 7. Total Payout Volume
   const totalPayoutVolume = successfulPayouts.reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
@@ -118,7 +167,94 @@ export const AdminOverviewDashboard: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-12 animate-in fade-in duration-300">
       
+      {/* TOP HEADER & DATE RANGE FILTER BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/80 p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <Filter className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              Dashboard Metrics
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 font-semibold">
+                {dateFilter === 'TODAY' && 'Today'}
+                {dateFilter === 'YESTERDAY' && 'Yesterday'}
+                {dateFilter === 'LAST_7_DAYS' && 'Last 7 Days'}
+                {dateFilter === 'THIS_MONTH' && 'This Month'}
+                {dateFilter === 'ALL' && 'All Time'}
+                {dateFilter === 'CUSTOM' && 'Custom Range'}
+              </span>
+            </h2>
+            <p className="text-xs text-slate-400">Filtered financial volumes and revenue reports</p>
+          </div>
+        </div>
 
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Date Filter Dropdown */}
+          <div className="flex items-center gap-2 bg-slate-950 border border-slate-700/80 hover:border-purple-500/50 rounded-xl px-3 py-2 text-xs transition shadow-sm">
+            <Calendar className="w-4 h-4 text-purple-400 shrink-0" />
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer pr-1 font-semibold"
+            >
+              <option value="TODAY" className="bg-slate-900 text-slate-200">Today</option>
+              <option value="YESTERDAY" className="bg-slate-900 text-slate-200">Yesterday</option>
+              <option value="LAST_7_DAYS" className="bg-slate-900 text-slate-200">Last 7 Days</option>
+              <option value="THIS_MONTH" className="bg-slate-900 text-slate-200">This Month</option>
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Time</option>
+              <option value="CUSTOM" className="bg-slate-900 text-slate-200">Custom Range</option>
+            </select>
+          </div>
+
+          {/* Custom Date Pickers */}
+          {dateFilter === 'CUSTOM' && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs animate-in fade-in">
+              <span className="text-[11px] text-slate-400 font-medium">From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+              />
+              <span className="text-[11px] text-slate-400 font-medium">To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-400 font-mono"
+              />
+            </div>
+          )}
+
+          {/* Reset button if not TODAY */}
+          {dateFilter !== 'TODAY' && (
+            <button
+              onClick={() => {
+                setDateFilter('TODAY');
+                setCustomStartDate('');
+                setCustomEndDate('');
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition border border-slate-700 shadow-sm"
+              title="Reset filter to Today"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          {/* Refresh Data button */}
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="p-2.5 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs transition disabled:opacity-50 shadow-sm"
+            title="Refresh Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-purple-400' : ''}`} />
+          </button>
+        </div>
+      </div>
 
       {/* USEPAY B2B AGENT API BALANCE INTEGRATION WIDGET */}
       <UsePayBalanceWidget />
