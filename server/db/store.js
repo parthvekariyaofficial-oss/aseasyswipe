@@ -20,7 +20,12 @@ export const db = {
     { id: 'poslab_03', min_amount: 25001, max_amount: 200000, charge_type: 'flat', charge_value: 25, is_active: true, created_at: new Date().toISOString() }
   ],
   payout_transactions: [],
-  wallet_ledger: []
+  wallet_ledger: [],
+  system_settings: {
+    user_qr_visible: true,
+    qr_request_section_enabled: true,
+    live_bill_pay_enabled: true
+  }
 };
 
 db.qr_master = db.qr_masters;

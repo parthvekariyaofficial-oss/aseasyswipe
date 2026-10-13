@@ -8,12 +8,15 @@ import {
   CreditCard, Search, ShieldCheck, CheckCircle2, Clock, AlertCircle, ArrowRight, 
   RefreshCw, FileText, Lock, ChevronDown
 } from 'lucide-react';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const defaultCategoriesList: BillerCategory[] = [
   { category_id: 7, category_name: "Credit Card" }
 ];
 
 export const LiveBillPayment: React.FC = () => {
+  const { liveBillPayEnabled } = useSettingsStore();
+
   // Category & Biller State (Credit Card Only - Fetched from Database)
   const [categories] = useState<BillerCategory[]>(defaultCategoriesList);
   const [billers, setBillers] = useState<Biller[]>([]);
@@ -262,6 +265,31 @@ export const LiveBillPayment: React.FC = () => {
     (b.biller_name || '').toLowerCase().includes(billerSearch.toLowerCase()) ||
     (b.biller_id || '').toLowerCase().includes(billerSearch.toLowerCase())
   );
+
+  if (!liveBillPayEnabled) {
+    return (
+      <div className="w-full max-w-xl mx-auto my-12 p-8 bg-slate-900 border border-slate-800 rounded-3xl text-center space-y-4 shadow-2xl animate-in fade-in duration-300">
+        <div className="w-16 h-16 mx-auto rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-white">Live Bill Pay Service Disabled</h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Live Bill Payment service has been temporarily disabled by the administrator. 
+            Access to this feature and route is currently restricted.
+          </p>
+        </div>
+        <div className="pt-2">
+          <button
+            onClick={() => window.location.href = '/users'}
+            className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition border border-slate-700"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full pb-16 animate-in fade-in duration-300">

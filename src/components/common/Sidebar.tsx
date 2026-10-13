@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { 
   LogOut, Users, ChevronRight, X, Key, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft
 } from 'lucide-react';
@@ -26,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose
 }) => {
   const { user, logout, decrementTimer } = useAuthStore();
+  const { liveBillPayEnabled } = useSettingsStore();
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
@@ -127,11 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     if (user?.role === 'user') {
-      items.push({
-        id: 'live_bill_pay',
-        label: 'Live Bill Pay',
-        icon: Zap
-      });
+      if (liveBillPayEnabled) {
+        items.push({
+          id: 'live_bill_pay',
+          label: 'Live Bill Pay',
+          icon: Zap
+        });
+      }
       items.push({
         id: 'bill_request',
         label: 'Credit Card Bill Pay',

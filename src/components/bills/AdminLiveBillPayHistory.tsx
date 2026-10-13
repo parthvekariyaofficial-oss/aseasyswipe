@@ -3,8 +3,9 @@ import { b2bApi } from '../../services/api';
 import { 
   Clock, Search, RefreshCw, CheckCircle2, AlertCircle, 
   Receipt, Landmark, ShieldCheck, UserCheck, ArrowUpRight,
-  X, RotateCcw, Activity
+  X, RotateCcw, Activity, Zap, Check
 } from 'lucide-react';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export const AdminLiveBillPayHistory: React.FC = () => {
   const [historyList, setHistoryList] = useState<any[]>([]);
@@ -16,6 +17,10 @@ export const AdminLiveBillPayHistory: React.FC = () => {
     item: any;
     data: any;
   } | null>(null);
+
+  const { liveBillPayEnabled, toggleLiveBillPay, fetchSettings: fetchLiveBillSettings } = useSettingsStore();
+  const [isTogglingLiveBill, setIsTogglingLiveBill] = useState(false);
+  const [toggleAlert, setToggleAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchAdminHistory = async () => {
     setLoading(true);
@@ -33,7 +38,36 @@ export const AdminLiveBillPayHistory: React.FC = () => {
 
   useEffect(() => {
     fetchAdminHistory();
-  }, []);
+    fetchLiveBillSettings();
+  }, [fetchLiveBillSettings]);
+
+  const handleToggleLiveBill = async () => {
+    setIsTogglingLiveBill(true);
+    setToggleAlert(null);
+    try {
+      const res = await toggleLiveBillPay();
+      if (res.success) {
+        setToggleAlert({
+          type: 'success',
+          message: res.enabled 
+            ? '✅ Live Bill Pay enabled! Retailer portal menu is now VISIBLE and route is ACCESSIBLE.' 
+            : '🔒 Live Bill Pay disabled! Retailer portal menu is now HIDDEN and direct route URL is BLOCKED.'
+        });
+      } else {
+        setToggleAlert({
+          type: 'error',
+          message: res.message || 'Failed to update Live Bill Pay toggle.'
+        });
+      }
+    } catch (err: any) {
+      setToggleAlert({
+        type: 'error',
+        message: err.message || 'An unexpected error occurred while toggling Live Bill Pay.'
+      });
+    } finally {
+      setIsTogglingLiveBill(false);
+    }
+  };
 
   const handleCheckStatus = async (item: any) => {
     const txnId = item.client_transaction_id || item.transaction_id || item.bbps_txn_ref_id || item.id;
@@ -95,6 +129,93 @@ export const AdminLiveBillPayHistory: React.FC = () => {
     <div className="space-y-6 w-full pb-16 animate-in fade-in duration-300">
       
 
+
+      {/* TOP HEADER WITH LIVE BILL PAY TOGGLE SWITCH IN TOP RIGHT CORNER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-3xl shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                LiveBillPay Monitoring & Gateway Control
+              </h2>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                Monitor live BBPS transactions and control Retailer panel Live Bill Pay menu & route access
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* TOP RIGHT CORNER: TOGGLE SWITCH */}
+        <div className="flex items-center self-end sm:self-auto gap-3.5 bg-slate-950/80 border border-slate-800/80 px-4 py-3 rounded-2xl shadow-inner">
+          <div className="text-right">
+            <div className="flex items-center gap-1.5 justify-end">
+              <Zap className={`w-3.5 h-3.5 ${liveBillPayEnabled ? 'text-emerald-400 fill-emerald-400/20' : 'text-slate-500'}`} />
+              <span className="text-xs font-black text-white">Live Bill Pay Menu</span>
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                liveBillPayEnabled 
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+              }`}>
+                {liveBillPayEnabled ? 'ACTIVE / VISIBLE' : 'OFF / BLOCKED'}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              {liveBillPayEnabled 
+                ? 'User panel menu is visible & route accessible' 
+                : 'User menu is hidden & route URL blocked'}
+            </p>
+          </div>
+
+          {/* TOGGLE BUTTON */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={liveBillPayEnabled}
+            disabled={isTogglingLiveBill}
+            onClick={handleToggleLiveBill}
+            className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer items-center rounded-full p-1 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 shadow-inner ${
+              liveBillPayEnabled ? 'bg-emerald-600 justify-end' : 'bg-slate-800 justify-start'
+            } ${isTogglingLiveBill ? 'opacity-70 cursor-not-allowed' : ''}`}
+            title={liveBillPayEnabled ? 'Click to Turn OFF Live Bill Pay on User Panel' : 'Click to Turn ON Live Bill Pay on User Panel'}
+          >
+            <span
+              className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-all duration-300 flex items-center justify-center`}
+            >
+              {isTogglingLiveBill ? (
+                <RefreshCw className="w-3 h-3 text-slate-700 animate-spin" />
+              ) : liveBillPayEnabled ? (
+                <Check className="w-3 h-3 text-emerald-600 font-bold" />
+              ) : (
+                <X className="w-3 h-3 text-slate-500" />
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* FEEDBACK ALERT */}
+      {toggleAlert && (
+        <div className={`flex items-center justify-between p-3.5 rounded-2xl border text-xs font-semibold animate-in slide-in-from-top-2 ${
+          toggleAlert.type === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+            : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            {toggleAlert.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span>{toggleAlert.message}</span>
+          </div>
+          <button onClick={() => setToggleAlert(null)} className="text-slate-400 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* METRICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

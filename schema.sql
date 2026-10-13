@@ -89,13 +89,14 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
     id TEXT PRIMARY KEY DEFAULT 'qr_controls',
     user_qr_visible BOOLEAN DEFAULT true,
     qr_request_section_enabled BOOLEAN DEFAULT true,
+    live_bill_pay_enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Insert default control settings row ONLY IF NOT EXISTS
-INSERT INTO public.system_settings (id, user_qr_visible, qr_request_section_enabled)
-VALUES ('qr_controls', true, true)
+INSERT INTO public.system_settings (id, user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled)
+VALUES ('qr_controls', true, true, true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. BANK ACCOUNTS TABLE (Bank Entry Management)

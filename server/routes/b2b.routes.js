@@ -333,6 +333,14 @@ router.get('/billers', verifyToken, async (req, res) => {
  * Real-time Customer Bill Fetch
  */
 router.post('/fetch-bill', verifyToken, async (req, res) => {
+  // Check if Live Bill Pay is disabled by admin
+  if (req.user?.role !== 'admin' && db.system_settings && db.system_settings.live_bill_pay_enabled === false) {
+    return res.status(403).json({ 
+      status: 'error', 
+      message: 'Live Bill Pay service is currently disabled by administrator.' 
+    });
+  }
+
   const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
   const { billerId, mobile, customerParams } = req.body;
 
@@ -470,6 +478,14 @@ router.get('/calculate-charge', verifyToken, async (req, res) => {
  * Execute BBPS Bill Payment via UsePay B2B API with Slab Charge Deduction & Auto-Refund
  */
 router.post('/pay-bill', verifyToken, async (req, res) => {
+  // Check if Live Bill Pay is disabled by admin
+  if (req.user?.role !== 'admin' && db.system_settings && db.system_settings.live_bill_pay_enabled === false) {
+    return res.status(403).json({ 
+      status: 'error', 
+      message: 'Live Bill Pay service is currently disabled by administrator.' 
+    });
+  }
+
   const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
   const { 
     billerId, amount, mobile, paymentMode, client_transaction_id, 
@@ -903,6 +919,91 @@ router.get('/status/:transaction_id', verifyToken, requireRoles(['admin']), asyn
       polled_at: nowIso
     }
   });
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/b2b/settings (Fetch Live Bill Pay Control Setting)
+// -----------------------------------------------------------------------------
+router.get('/settings', verifyToken, async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true
+      };
+    }
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('*')
+          .eq('id', 'qr_controls')
+          .maybeSingle();
+        if (!error && data && data.live_bill_pay_enabled !== undefined) {
+          db.system_settings.live_bill_pay_enabled = data.live_bill_pay_enabled !== false;
+        }
+      } catch (sbErr) {
+        // Table or column may not exist yet, fallback to in-memory store
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      settings: {
+        live_bill_pay_enabled: db.system_settings.live_bill_pay_enabled !== false
+      }
+    });
+  } catch (error) {
+    console.error('Fetch B2B Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching B2B settings.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/b2b/settings (Admin Only - Update Live Bill Pay Toggle)
+// -----------------------------------------------------------------------------
+router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true
+      };
+    }
+
+    const { live_bill_pay_enabled } = req.body;
+    if (live_bill_pay_enabled !== undefined) {
+      db.system_settings.live_bill_pay_enabled = Boolean(live_bill_pay_enabled);
+    }
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('system_settings')
+          .upsert([{
+            id: 'qr_controls',
+            live_bill_pay_enabled: db.system_settings.live_bill_pay_enabled,
+            updated_at: new Date().toISOString()
+          }]);
+      } catch (sbErr) {
+        // Supabase column might not exist yet, safe in-memory fallback
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Live Bill Pay service ${db.system_settings.live_bill_pay_enabled ? 'enabled' : 'disabled'} successfully.`,
+      settings: {
+        live_bill_pay_enabled: db.system_settings.live_bill_pay_enabled
+      }
+    });
+  } catch (error) {
+    console.error('Update B2B Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error updating B2B settings.' });
+  }
 });
 
 export default router;

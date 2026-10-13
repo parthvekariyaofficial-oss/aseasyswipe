@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
+import { useSettingsStore } from './store/settingsStore';
 import { userApi } from './services/api';
 import { Sidebar } from './components/common/Sidebar';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
@@ -28,6 +29,7 @@ import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
 
 export default function App() {
   const { user, isAuthenticated, logout, updateUser, sessionRemainingSeconds } = useAuthStore();
+  const { liveBillPayEnabled, fetchSettings } = useSettingsStore();
   const getTabFromPath = (path: string, role?: string): string => {
     const p = path.toLowerCase().trim();
     if (p.includes('admin-statement') || p.includes('admin_statement')) return 'admin_statement';
@@ -39,7 +41,10 @@ export default function App() {
     if (p.includes('admin-bill-requests') || p.includes('admin_bill_requests')) return 'admin_bill_requests';
     if (p.includes('live-bill-history') || p.includes('live_bill_history')) return 'live_bill_history';
     if (p.includes('live-bill-pay') || p.includes('live_bill_pay')) {
-      return role === 'user' ? 'live_bill_pay' : (role === 'admin' ? 'live_bill_history' : 'users');
+      if (role === 'user') {
+        return liveBillPayEnabled ? 'live_bill_pay' : 'users';
+      }
+      return role === 'admin' ? 'live_bill_history' : 'users';
     }
     if (p.includes('bill-request') || p.includes('bill_request')) return 'bill_request';
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
@@ -96,12 +101,33 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated, updateUser]);
 
+  // Auto-sync system settings periodically
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchSettings();
+    const interval = setInterval(fetchSettings, 5000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchSettings]);
+
+  // Guard direct URL / tab navigation if Live Bill Pay is disabled for retailer
+  useEffect(() => {
+    if (user?.role === 'user' && !liveBillPayEnabled && activeTab === 'live_bill_pay') {
+      setActiveTabState('users');
+      setCurrentPath('/users');
+      window.history.replaceState({ tab: 'users' }, '', '/users');
+    }
+  }, [user?.role, liveBillPayEnabled, activeTab]);
+
   const handleTabChange = (tabId: string) => {
-    setActiveTabState(tabId);
-    const targetPath = getPathFromTab(tabId);
+    let finalTab = tabId;
+    if (user?.role === 'user' && !liveBillPayEnabled && tabId === 'live_bill_pay') {
+      finalTab = 'users';
+    }
+    setActiveTabState(finalTab);
+    const targetPath = getPathFromTab(finalTab);
     setCurrentPath(targetPath);
     if (window.location.pathname !== targetPath) {
-      window.history.pushState({ tab: tabId }, '', targetPath);
+      window.history.pushState({ tab: finalTab }, '', targetPath);
     }
   };
 
@@ -415,7 +441,11 @@ export default function App() {
             </ProtectedRoute>
           )}
           {activeTab === 'live_bill_pay' && (
-            user.role === 'user' ? <LiveBillPayment /> : (user.role === 'admin' ? <AdminLiveBillPayHistory /> : renderDashboardByRole(user.role))
+            user.role === 'user' ? (
+              liveBillPayEnabled ? <LiveBillPayment /> : renderDashboardByRole(user.role)
+            ) : (
+              user.role === 'admin' ? <AdminLiveBillPayHistory /> : renderDashboardByRole(user.role)
+            )
           )}
           {activeTab === 'bill_request' && <UserBillPaymentRequest />}
           {activeTab === 'qr_master' && <QRMasterManagement />}

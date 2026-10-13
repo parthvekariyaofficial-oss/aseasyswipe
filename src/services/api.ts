@@ -326,6 +326,16 @@ export const b2bApi = {
   calculateCharge: async (amount: number) => {
     const response = await apiClient.get('/b2b/calculate-charge', { params: { amount } });
     return response.data;
+  },
+
+  getSettings: async () => {
+    const response = await apiClient.get('/b2b/settings');
+    return response.data;
+  },
+
+  updateSettings: async (data: { live_bill_pay_enabled: boolean }) => {
+    const response = await apiClient.post('/b2b/settings', data);
+    return response.data;
   }
 };
 
