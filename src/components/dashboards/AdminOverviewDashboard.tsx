@@ -4,11 +4,12 @@ import type { QrPaymentRequest } from '../../types/qr';
 import type { UserProfile } from '../../types/auth';
 import type { CreditCardBillRequest } from '../../types/billRequest';
 import type { PayoutTransaction } from '../../types/payout';
-import { UsePayBalanceWidget } from './UsePayBalanceWidget';
+import type { UsePayBalanceData } from '../../types/b2b';
 import { 
   CheckCircle2, ShieldCheck, Users, Building2, Wallet, 
   ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt,
-  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, CircleDollarSign
+  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, CircleDollarSign,
+  AlertCircle
 } from 'lucide-react';
 
 export const AdminOverviewDashboard: React.FC = () => {
@@ -17,6 +18,9 @@ export const AdminOverviewDashboard: React.FC = () => {
   const [billRequestsList, setBillRequestsList] = useState<CreditCardBillRequest[]>([]);
   const [liveHistoryList, setLiveHistoryList] = useState<any[]>([]);
   const [payoutTxnsList, setPayoutTxnsList] = useState<PayoutTransaction[]>([]);
+  const [usepayData, setUsepayData] = useState<UsePayBalanceData | null>(null);
+  const [usepayLoading, setUsepayLoading] = useState(false);
+  const [usepayError, setUsepayError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Date Filter State (Default: TODAY)
@@ -24,15 +28,37 @@ export const AdminOverviewDashboard: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
+  const fetchUsepayBalanceOnly = async () => {
+    setUsepayLoading(true);
+    try {
+      const res = await b2bApi.getUsepayBalance();
+      if (res && res.success && res.data) {
+        setUsepayData(res.data);
+        if (res.message && res.is_mock) {
+          setUsepayError(res.message);
+        } else {
+          setUsepayError(null);
+        }
+      } else if (res && res.message) {
+        setUsepayError(res.message);
+      }
+    } catch (err: any) {
+      console.error('Fetch UsePay Balance Error:', err);
+    } finally {
+      setUsepayLoading(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [reqRes, userRes, billRes, b2bRes, payoutRes] = await Promise.all([
+      const [reqRes, userRes, billRes, b2bRes, payoutRes, usepayRes] = await Promise.all([
         qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] })),
         userApi.getHierarchy().catch(() => ({ success: false, users: [] })),
         billRequestApi.getRequests().catch(() => ({ success: false, requests: [] })),
         b2bApi.getHistory().catch(() => ({ status: 'error', data: [] })),
-        payoutApi.getHistory().catch(() => ({ success: false, transactions: [] }))
+        payoutApi.getHistory().catch(() => ({ success: false, transactions: [] })),
+        b2bApi.getUsepayBalance().catch(() => ({ success: false, data: null }))
       ]);
 
       if (reqRes.success && reqRes.payment_requests) {
@@ -49,6 +75,16 @@ export const AdminOverviewDashboard: React.FC = () => {
       }
       if (payoutRes.success && Array.isArray(payoutRes.transactions)) {
         setPayoutTxnsList(payoutRes.transactions);
+      }
+      if (usepayRes && usepayRes.success && usepayRes.data) {
+        setUsepayData(usepayRes.data);
+        if (usepayRes.message && usepayRes.is_mock) {
+          setUsepayError(usepayRes.message);
+        } else {
+          setUsepayError(null);
+        }
+      } else if (usepayRes && usepayRes.message) {
+        setUsepayError(usepayRes.message);
       }
     } catch (err) {
       console.error('Fetch Overview Data Error:', err);
@@ -259,8 +295,153 @@ export const AdminOverviewDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* USEPAY B2B AGENT API BALANCE INTEGRATION WIDGET */}
-      <UsePayBalanceWidget />
+      {/* 5 OPERATIONAL WALLET & SYSTEM STATUS CARDS IN ONE ROW */}
+      <div className="space-y-3">
+        {/* UsePay Notice / Warning Alert if applicable */}
+        {usepayError && (
+          <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-3 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-200">
+              <span className="font-bold">API Notice: </span>
+              <span className="text-amber-300/90">{usepayError}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+
+          {/* 1. INSTANT PAYOUT WALLET */}
+          <div className="bg-gradient-to-br from-indigo-950/60 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl hover:border-indigo-500/50 transition group flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-indigo-500/20 transition" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] uppercase font-extrabold text-indigo-400 tracking-wider">Instant Payout Wallet</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                  usepayData?.is_payout_enabled 
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' 
+                    : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                }`}>
+                  {usepayData?.is_payout_enabled ? '24x7 Active' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-white font-mono">
+                {usepayLoading ? (
+                  <span className="text-slate-500 text-sm">Loading...</span>
+                ) : (
+                  `₹${Number(usepayData?.payout_wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                )}
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-indigo-500/20 font-medium">
+              <span className="flex items-center gap-1 text-indigo-300 text-[10px] sm:text-[11px]">
+                <ArrowRightLeft className="w-3.5 h-3.5" /> 24x7 Payouts
+              </span>
+              <button 
+                onClick={fetchUsepayBalanceOnly}
+                title="Sync Balance"
+                className="text-slate-400 hover:text-white transition p-0.5"
+              >
+                <RefreshCw className={`w-3 h-3 ${usepayLoading ? 'animate-spin text-indigo-400' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. BBPS UTILITY WALLET */}
+          <div className="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl hover:border-emerald-500/50 transition group flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/20 transition" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] uppercase font-extrabold text-emerald-400 tracking-wider">BBPS Utility Wallet</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                  usepayData?.is_bbps_enabled 
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                    : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                }`}>
+                  {usepayData?.is_bbps_enabled ? 'Active' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-white font-mono">
+                {usepayLoading ? (
+                  <span className="text-slate-500 text-sm">Loading...</span>
+                ) : (
+                  `₹${Number(usepayData?.bbps_wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                )}
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-emerald-500/20 font-medium">
+              <span className="text-[10px] sm:text-[11px]">Usable:</span>
+              <span className="font-mono text-emerald-400 font-bold text-[10px] sm:text-[11px]">
+                ₹{Number(usepayData?.usable_bbps_balance || usepayData?.bbps_wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {/* 3. ACTIVE ACCOUNTS */}
+          <div className="bg-gradient-to-br from-blue-950/60 via-slate-900 to-slate-900 border border-blue-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl hover:border-blue-500/50 transition group flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/20 transition" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] uppercase font-extrabold text-blue-400 tracking-wider">Active Accounts</span>
+                <div className="p-1.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-white font-mono">
+                {activeUserCount} <span className="text-sm font-semibold text-slate-400">/ {usersList.length}</span>
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-blue-500/20 font-medium">
+              <span className="text-[10px] sm:text-[11px]">Ratio:</span>
+              <span className="text-blue-300 font-bold text-[10px] sm:text-[11px]">
+                {usersList.length > 0 ? `${Math.round((activeUserCount / usersList.length) * 100)}% Active` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          {/* 4. TOTAL USER LIVE WALLET BALANCE */}
+          <div className="bg-gradient-to-br from-purple-950/60 via-slate-900 to-slate-900 border border-purple-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl hover:border-purple-500/50 transition group flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-purple-500/20 transition" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] uppercase font-extrabold text-purple-400 tracking-wider truncate" title="Total User Live Wallet Balance">Total User Live Wallet Balance</span>
+                <div className="p-1.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  <Wallet className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-white font-mono">
+                ₹{totalSystemBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-purple-500/20 font-medium">
+              <span className="text-[10px] sm:text-[11px]">Platform:</span>
+              <span className="text-purple-300 font-bold text-[10px] sm:text-[11px]">All User Wallets</span>
+            </div>
+          </div>
+
+          {/* 5. PENDING APPROVALS */}
+          <div className="bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-900 border border-amber-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl hover:border-amber-500/50 transition group flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-amber-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/20 transition" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] uppercase font-extrabold text-amber-400 tracking-wider">Pending Approvals</span>
+                <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-amber-400 font-mono">
+                {pendingRequests.length + pendingBillRequests.length + pendingPayouts.length}
+              </p>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-amber-500/20 font-medium">
+              <span className="truncate text-[10px] sm:text-[11px]">Queue:</span>
+              <span className="text-amber-300 font-bold font-mono text-[10px] sm:text-[11px]">
+                {pendingRequests.length} QR / {pendingBillRequests.length} CC{pendingPayouts.length > 0 ? ` / ${pendingPayouts.length} Payout` : ''}
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
 
       {/* ALL PRIMARY STAT CARDS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -471,42 +652,7 @@ export const AdminOverviewDashboard: React.FC = () => {
 
       </div>
 
-      {/* SECONDARY PLATFORM METRICS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] uppercase font-bold text-slate-400">Pending Approvals</p>
-            <p className="text-2xl font-bold text-amber-400 mt-1">
-              {pendingRequests.length} QR / {pendingBillRequests.length} CC{pendingPayouts.length > 0 ? ` / ${pendingPayouts.length} Payout` : ''}
-            </p>
-          </div>
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
-            <Clock className="w-6 h-6" />
-          </div>
-        </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] uppercase font-bold text-slate-400">Total User Live Wallet Balance</p>
-            <p className="text-2xl font-bold text-emerald-400 mt-1 font-mono">
-              ₹{totalSystemBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
-            <Wallet className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] uppercase font-bold text-slate-400">Active Accounts</p>
-            <p className="text-2xl font-bold text-indigo-400 mt-1">{activeUserCount} / {usersList.length}</p>
-          </div>
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl">
-            <Users className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
 
     </div>
   );
