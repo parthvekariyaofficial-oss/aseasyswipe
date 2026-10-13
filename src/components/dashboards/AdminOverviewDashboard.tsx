@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { qrApi, userApi, billRequestApi, b2bApi } from '../../services/api';
+import { qrApi, userApi, billRequestApi, b2bApi, payoutApi } from '../../services/api';
 import type { QrPaymentRequest } from '../../types/qr';
 import type { UserProfile } from '../../types/auth';
 import type { CreditCardBillRequest } from '../../types/billRequest';
+import type { PayoutTransaction } from '../../types/payout';
 import { UsePayBalanceWidget } from './UsePayBalanceWidget';
 import { 
   CheckCircle2, ShieldCheck, Users, Building2, Wallet, 
-  ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt
+  ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt,
+  ArrowRightLeft, IndianRupee
 } from 'lucide-react';
 
 export const AdminOverviewDashboard: React.FC = () => {
@@ -14,16 +16,18 @@ export const AdminOverviewDashboard: React.FC = () => {
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [billRequestsList, setBillRequestsList] = useState<CreditCardBillRequest[]>([]);
   const [liveHistoryList, setLiveHistoryList] = useState<any[]>([]);
+  const [payoutTxnsList, setPayoutTxnsList] = useState<PayoutTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [reqRes, userRes, billRes, b2bRes] = await Promise.all([
+      const [reqRes, userRes, billRes, b2bRes, payoutRes] = await Promise.all([
         qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] })),
         userApi.getHierarchy().catch(() => ({ success: false, users: [] })),
         billRequestApi.getRequests().catch(() => ({ success: false, requests: [] })),
-        b2bApi.getHistory().catch(() => ({ status: 'error', data: [] }))
+        b2bApi.getHistory().catch(() => ({ status: 'error', data: [] })),
+        payoutApi.getHistory().catch(() => ({ success: false, transactions: [] }))
       ]);
 
       if (reqRes.success && reqRes.payment_requests) {
@@ -37,6 +41,9 @@ export const AdminOverviewDashboard: React.FC = () => {
       }
       if (b2bRes && (b2bRes.status === 'success' || b2bRes.success) && Array.isArray(b2bRes.data)) {
         setLiveHistoryList(b2bRes.data);
+      }
+      if (payoutRes.success && Array.isArray(payoutRes.transactions)) {
+        setPayoutTxnsList(payoutRes.transactions);
       }
     } catch (err) {
       console.error('Fetch Overview Data Error:', err);
@@ -94,6 +101,16 @@ export const AdminOverviewDashboard: React.FC = () => {
   const liveBillVolume = successfulLivePayments.reduce((acc, r) => acc + Number(r.amount || 0), 0);
   const totalApprovedBillAmount = offlineBillVolume + liveBillVolume;
 
+  // Filter successful & pending payout transactions
+  const successfulPayouts = payoutTxnsList.filter(t => t.status === 'success');
+  const pendingPayouts = payoutTxnsList.filter(t => t.status === 'pending');
+
+  // 7. Total Payout Volume
+  const totalPayoutVolume = successfulPayouts.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+  // 8. Total Payout Charges
+  const totalPayoutCharges = successfulPayouts.reduce((acc, t) => acc + Number(t.slab_charge || 0), 0);
+
   // Platform wallet stats
   const totalSystemBalance = usersList.reduce((acc, u) => acc + Number(u.wallet_balance || 0), 0);
   const activeUserCount = usersList.filter(u => u.status === 'Active').length;
@@ -107,7 +124,7 @@ export const AdminOverviewDashboard: React.FC = () => {
       <UsePayBalanceWidget />
 
       {/* ALL PRIMARY STAT CARDS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
 
         {/* CARD 1: TOTAL APPROVED QR AMOUNT */}
         <div className="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-3xl p-6 relative overflow-hidden shadow-xl hover:border-emerald-500/50 transition group">
@@ -241,6 +258,42 @@ export const AdminOverviewDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* CARD 7: TOTAL PAYOUT VOLUME */}
+        <div className="bg-gradient-to-br from-blue-950/80 via-slate-900 to-slate-900 border border-blue-500/40 rounded-3xl p-6 relative overflow-hidden shadow-2xl hover:border-blue-500/60 transition group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/20 transition" />
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[11px] uppercase font-extrabold text-blue-300 tracking-wider">Total Payout Volume</span>
+            <div className="p-3 rounded-2xl bg-blue-500/20 border border-blue-500/40 text-blue-300">
+              <ArrowRightLeft className="w-6 h-6" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-white font-mono">
+            ₹{totalPayoutVolume.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="flex items-center gap-1.5 mt-3 text-[11px] text-blue-300/80 font-medium">
+            <ArrowUpRight className="w-3.5 h-3.5 text-blue-400" />
+            <span>{successfulPayouts.length} Settled Bank Transfer(s)</span>
+          </div>
+        </div>
+
+        {/* CARD 8: PAYOUT CHARGES */}
+        <div className="bg-gradient-to-br from-teal-950/80 via-slate-900 to-slate-900 border border-teal-500/40 rounded-3xl p-6 relative overflow-hidden shadow-2xl hover:border-teal-500/60 transition group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl pointer-events-none group-hover:bg-teal-500/20 transition" />
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[11px] uppercase font-extrabold text-teal-300 tracking-wider">Payout Charges</span>
+            <div className="p-3 rounded-2xl bg-teal-500/20 border border-teal-500/40 text-teal-300">
+              <IndianRupee className="w-6 h-6" />
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-white font-mono">
+            ₹{totalPayoutCharges.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="flex items-center gap-1.5 mt-3 text-[11px] text-teal-300/80 font-medium">
+            <Coins className="w-3.5 h-3.5 text-teal-400" />
+            <span>Instant Transfer Slabs Revenue</span>
+          </div>
+        </div>
+
       </div>
 
       {/* SECONDARY PLATFORM METRICS */}
@@ -249,7 +302,7 @@ export const AdminOverviewDashboard: React.FC = () => {
           <div>
             <p className="text-[10px] uppercase font-bold text-slate-400">Pending Approvals</p>
             <p className="text-2xl font-bold text-amber-400 mt-1">
-              {pendingRequests.length} QR / {pendingBillRequests.length} CC Bill
+              {pendingRequests.length} QR / {pendingBillRequests.length} CC{pendingPayouts.length > 0 ? ` / ${pendingPayouts.length} Payout` : ''}
             </p>
           </div>
           <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
