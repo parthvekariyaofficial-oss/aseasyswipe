@@ -50,7 +50,7 @@ export const DistributorDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase">
-              Distributor (DS) Dashboard
+              Distributor Dashboard
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-white">
               Welcome, {user?.name}

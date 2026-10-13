@@ -129,7 +129,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
         `👤 *Name:* ${createdCredentials.user.name}\n` +
         `📱 *User ID / Mobile:* ${createdCredentials.user.mobile_number}\n` +
         `🔑 *Temporary Password:* ${createdCredentials.generatedPassword}\n` +
-        `🏷️ *Role:* ${createdCredentials.user.role === 'super_distributor' ? 'Master Distributor (MS)' : createdCredentials.user.role === 'distributor' ? 'Distributor (DS)' : 'Retailer'}\n\n` +
+        `🏷️ *Role:* ${createdCredentials.user.role === 'super_distributor' ? 'Super Distributor' : createdCredentials.user.role === 'distributor' ? 'Distributor' : 'Retailer'}\n\n` +
         `🔐 *Note:* Mandatory password change required on first login.\n` +
         `🌐 *Portal:* ${window.location.origin}`;
       
@@ -172,7 +172,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
               <span className="text-slate-400 uppercase font-sans text-[10px] font-bold">Account Role</span>
               <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-sans text-xs font-bold uppercase border border-purple-500/30">
-                {createdCredentials.user.role === 'super_distributor' ? 'Master Distributor (MS)' : createdCredentials.user.role === 'distributor' ? 'Distributor (DS)' : 'Retailer'}
+                {createdCredentials.user.role === 'super_distributor' ? 'Super Distributor' : createdCredentials.user.role === 'distributor' ? 'Distributor' : 'Retailer'}
               </span>
             </div>
 
@@ -591,15 +591,15 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition appearance-none cursor-pointer disabled:opacity-80 disabled:cursor-not-allowed"
                     >
                       {currentUser?.role === 'super_distributor' ? (
-                        <option value="distributor">Distributor (DS)</option>
+                        <option value="distributor">Distributor</option>
                       ) : currentUser?.role === 'distributor' ? (
-                        <option value="user">Standard User (Retailer)</option>
+                        <option value="user">Retailer</option>
                       ) : (
                         <>
-                          <option value="user">Standard User (Retailer)</option>
-                          <option value="distributor">Distributor (DS)</option>
-                          <option value="super_distributor">Super Distributor (MS)</option>
-                          <option value="admin">Super Admin HQ</option>
+                          <option value="user">Retailer</option>
+                          <option value="distributor">Distributor</option>
+                          <option value="super_distributor">Super Distributor</option>
+                          <option value="admin">Admin</option>
                         </>
                       )}
                     </select>

@@ -55,7 +55,7 @@ export const SuperDistributorDashboard: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-2xl">
         <div>
           <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <Award className="w-6 h-6 text-amber-400" /> Super Distributor (MS) Dashboard
+            <Award className="w-6 h-6 text-amber-400" /> Super Distributor Dashboard
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             Master Network Hierarchy: Oversee mapped Distributors & Retailer outlets.
@@ -190,7 +190,7 @@ export const SuperDistributorDashboard: React.FC = () => {
                       <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${
                         member.role === 'distributor' ? 'bg-blue-500/20 text-blue-300' : 'bg-emerald-500/20 text-emerald-300'
                       }`}>
-                        {member.role === 'distributor' ? 'Distributor (DS)' : 'Retailer'}
+                        {member.role === 'distributor' ? 'Distributor' : 'Retailer'}
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono text-indigo-300">{member.mobile_number}</td>

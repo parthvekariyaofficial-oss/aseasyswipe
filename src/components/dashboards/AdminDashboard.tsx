@@ -227,8 +227,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                 className="bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-xl p-2 focus:outline-none"
               >
                 <option value="ALL">All Hierarchy Roles</option>
-                <option value="super_distributor">Super Distributor (MS)</option>
-                <option value="distributor">Distributor (DS)</option>
+                <option value="super_distributor">Super Distributor</option>
+                <option value="distributor">Distributor</option>
                 <option value="user">Retailer</option>
               </select>
 
@@ -309,7 +309,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                           u.role === 'distributor' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
                           'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                         }`}>
-                          {u.role === 'super_distributor' ? 'Super Dist (MS)' : u.role === 'distributor' ? 'Distributor (DS)' : 'Retailer'}
+                          {u.role === 'super_distributor' ? 'Super Distributor' : u.role === 'distributor' ? 'Distributor' : 'Retailer'}
                         </span>
                       </td>
 

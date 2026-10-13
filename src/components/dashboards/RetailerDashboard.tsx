@@ -134,10 +134,10 @@ export const RetailerDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase">
-              Retailer Merchant Portal
+              Retailer Portal
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-white">
-              Welcome, {user?.name || 'Retailer Merchant'}
+              Welcome, {user?.name || 'Retailer'}
             </h1>
             <p className="text-xs text-slate-400">
               Firm: <strong className="text-slate-200">{user?.firm_name}</strong> | Mobile: <span className="font-mono text-slate-300">{user?.mobile_number}</span>

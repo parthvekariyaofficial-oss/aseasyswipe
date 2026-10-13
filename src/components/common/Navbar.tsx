@@ -38,10 +38,10 @@ export const Navbar: React.FC<NavbarProps> = () => {
 
   const getRoleLabel = (role?: UserRole) => {
     switch (role) {
-      case 'admin': return 'Super Admin HQ';
-      case 'super_distributor': return 'Super Distributor (MS)';
-      case 'distributor': return 'Distributor (DS)';
-      case 'user': return 'Retailer Merchant';
+      case 'admin': return 'Admin';
+      case 'super_distributor': return 'Super Distributor';
+      case 'distributor': return 'Distributor';
+      case 'user': return 'Retailer';
       default: return 'User';
     }
   };

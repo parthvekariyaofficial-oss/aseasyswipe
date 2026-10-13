@@ -322,7 +322,7 @@ export const QRPaymentRequests: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-7 rounded-3xl shadow-2xl">
           <div className="space-y-1">
             <span className="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-bold uppercase tracking-wider">
-              {isSuperDistributor ? 'Master Network Downline (MS)' : 'Distributor Network Downline (DS)'}
+              {isSuperDistributor ? 'Super Distributor Downline' : 'Distributor Downline'}
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-2 tracking-tight">
               <QrCode className="w-7 h-7 text-purple-400" /> 
