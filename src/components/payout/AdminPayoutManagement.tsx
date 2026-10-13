@@ -32,10 +32,6 @@ export const AdminPayoutManagement: React.FC = () => {
   const [slabModalError, setSlabModalError] = useState<string>('');
   const [savingSlab, setSavingSlab] = useState<boolean>(false);
 
-  // Test Calculator in Admin
-  const [testAmount, setTestAmount] = useState<string>('5000');
-  const [testResult, setTestResult] = useState<{ charge: number; total: number; slab?: PayoutSlab | null } | null>(null);
-
   // Transactions State
   const [transactions, setTransactions] = useState<PayoutTransaction[]>([]);
   const [txnsLoading, setTxnsLoading] = useState<boolean>(false);
@@ -117,33 +113,6 @@ export const AdminPayoutManagement: React.FC = () => {
       fetchTransactions();
     }
   }, [activeTab]);
-
-  // Recalculate test result when slabs or testAmount changes
-  useEffect(() => {
-    const num = parseFloat(testAmount);
-    if (isNaN(num) || num <= 0) {
-      setTestResult(null);
-      return;
-    }
-
-    const activeSlabs = slabs.filter(s => s.is_active !== false);
-    const matching = activeSlabs.find(s => num >= s.min_amount && num <= s.max_amount);
-
-    let chg = 0;
-    if (matching) {
-      chg = matching.charge_type === 'percentage'
-        ? parseFloat(((num * matching.charge_value) / 100).toFixed(2))
-        : parseFloat(matching.charge_value.toFixed(2));
-    } else {
-      chg = num <= 1000 ? 10 : (num <= 25000 ? 15 : 25);
-    }
-
-    setTestResult({
-      charge: chg,
-      total: num + chg,
-      slab: matching || null
-    });
-  }, [testAmount, slabs]);
 
   const openAddSlabModal = () => {
     setEditingSlab(null);
@@ -480,47 +449,6 @@ export const AdminPayoutManagement: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Test Live Calculator Widget in Admin */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-3">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Sliders className="w-4 h-4 text-indigo-400" /> Test Live Slab Calculation
-            </h3>
-            <p className="text-xs text-slate-400">
-              Test how much charge will be deducted from a merchant's wallet for a given transfer amount based on current slabs.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-              <div className="relative w-full sm:w-64">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₹</span>
-                <input
-                  type="number"
-                  value={testAmount}
-                  onChange={(e) => setTestAmount(e.target.value)}
-                  placeholder="e.g. 5000"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-4 py-2.5 text-white font-bold text-sm focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              {testResult && (
-                <div className="flex items-center gap-3 text-xs bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl w-full sm:w-auto">
-                  <span className="text-slate-400">
-                    Slab Charge: <strong className="text-amber-400 font-bold">+₹{testResult.charge.toFixed(2)}</strong>
-                  </span>
-                  <span className="text-slate-600">|</span>
-                  <span className="text-slate-400">
-                    Total Debit: <strong className="text-emerald-400 font-black">₹{testResult.total.toFixed(2)}</strong>
-                  </span>
-                  {testResult.slab && (
-                    <span className="text-[10px] text-indigo-400 font-mono">
-                      (Matched: ₹{testResult.slab.min_amount} - ₹{testResult.slab.max_amount})
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
         </div>
       )}
 
