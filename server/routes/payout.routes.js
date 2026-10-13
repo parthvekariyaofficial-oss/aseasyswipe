@@ -264,6 +264,14 @@ const activePayoutLocks = new Set();
 
 // POST /api/payout/transfer
 router.post('/transfer', verifyToken, async (req, res) => {
+  // Check if Instant Payout is disabled by admin
+  if (req.user?.role !== 'admin' && db.system_settings && db.system_settings.instant_payout_enabled === false) {
+    return res.status(403).json({
+      success: false,
+      message: 'Instant Payout service is currently disabled by administrator.'
+    });
+  }
+
   const userId = req.user.id;
 
   // 1. Guard against concurrent / double requests for the same user
@@ -816,6 +824,93 @@ router.get('/history', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('Fetch Payout History Error:', err);
     return res.status(500).json({ success: false, message: 'Failed to fetch payout history' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/payout/settings (Fetch Instant Payout Control Setting)
+// -----------------------------------------------------------------------------
+router.get('/settings', verifyToken, async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true,
+        instant_payout_enabled: true
+      };
+    }
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('*')
+          .eq('id', 'qr_controls')
+          .maybeSingle();
+        if (!error && data && data.instant_payout_enabled !== undefined) {
+          db.system_settings.instant_payout_enabled = data.instant_payout_enabled !== false;
+        }
+      } catch (sbErr) {
+        // Table or column may not exist yet, fallback to in-memory store
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      settings: {
+        instant_payout_enabled: db.system_settings.instant_payout_enabled !== false
+      }
+    });
+  } catch (error) {
+    console.error('Fetch Payout Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching payout settings.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/payout/settings (Admin Only - Update Instant Payout Toggle)
+// -----------------------------------------------------------------------------
+router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    if (!db.system_settings) {
+      db.system_settings = {
+        user_qr_visible: true,
+        qr_request_section_enabled: true,
+        live_bill_pay_enabled: true,
+        instant_payout_enabled: true
+      };
+    }
+
+    const { instant_payout_enabled } = req.body;
+    if (instant_payout_enabled !== undefined) {
+      db.system_settings.instant_payout_enabled = Boolean(instant_payout_enabled);
+    }
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('system_settings')
+          .upsert([{
+            id: 'qr_controls',
+            instant_payout_enabled: db.system_settings.instant_payout_enabled,
+            updated_at: new Date().toISOString()
+          }]);
+      } catch (sbErr) {
+        // Supabase column might not exist yet, safe in-memory fallback
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Instant Payout service ${db.system_settings.instant_payout_enabled ? 'enabled' : 'disabled'} successfully.`,
+      settings: {
+        instant_payout_enabled: db.system_settings.instant_payout_enabled
+      }
+    });
+  } catch (error) {
+    console.error('Update Payout Settings Error:', error);
+    return res.status(500).json({ success: false, message: 'Error updating payout settings.' });
   }
 });
 

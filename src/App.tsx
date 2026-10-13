@@ -29,13 +29,16 @@ import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
 
 export default function App() {
   const { user, isAuthenticated, logout, updateUser, sessionRemainingSeconds } = useAuthStore();
-  const { liveBillPayEnabled, fetchSettings } = useSettingsStore();
+  const { liveBillPayEnabled, instantPayoutEnabled, fetchSettings } = useSettingsStore();
   const getTabFromPath = (path: string, role?: string): string => {
     const p = path.toLowerCase().trim();
     if (p.includes('admin-statement') || p.includes('admin_statement')) return 'admin_statement';
     if (p.includes('statement') || p.includes('passbook')) return role === 'admin' ? 'admin_statement' : 'user_statement';
     if (p.includes('admin-payout') || p.includes('admin_payout')) return 'admin_payout';
-    if (p.includes('payout')) return role === 'admin' ? 'admin_payout' : 'payout_transfer';
+    if (p.includes('payout')) {
+      if (role === 'admin') return 'admin_payout';
+      return instantPayoutEnabled ? 'payout_transfer' : 'users';
+    }
     if (p.includes('dashboard')) return 'dashboard';
     if (p.includes('bank-entry') || p.includes('bank_entry')) return 'bank_entry';
     if (p.includes('admin-bill-requests') || p.includes('admin_bill_requests')) return 'admin_bill_requests';
@@ -118,9 +121,21 @@ export default function App() {
     }
   }, [user?.role, liveBillPayEnabled, activeTab]);
 
+  // Guard direct URL / tab navigation if Instant Payout is disabled for users
+  useEffect(() => {
+    if (user?.role !== 'admin' && !instantPayoutEnabled && activeTab === 'payout_transfer') {
+      setActiveTabState('users');
+      setCurrentPath('/users');
+      window.history.replaceState({ tab: 'users' }, '', '/users');
+    }
+  }, [user?.role, instantPayoutEnabled, activeTab]);
+
   const handleTabChange = (tabId: string) => {
     let finalTab = tabId;
     if (user?.role === 'user' && !liveBillPayEnabled && tabId === 'live_bill_pay') {
+      finalTab = 'users';
+    }
+    if (user?.role !== 'admin' && !instantPayoutEnabled && tabId === 'payout_transfer') {
       finalTab = 'users';
     }
     setActiveTabState(finalTab);
@@ -424,7 +439,9 @@ export default function App() {
             </ProtectedRoute>
           )}
           {activeTab === 'user_statement' && <UserAccountStatement />}
-          {activeTab === 'payout_transfer' && <UserPayoutTransfer />}
+          {activeTab === 'payout_transfer' && (
+            instantPayoutEnabled ? <UserPayoutTransfer /> : renderDashboardByRole(user.role)
+          )}
           {activeTab === 'bank_entry' && (
             <ProtectedRoute allowedRoles={['admin']}>
               <BankManagement />

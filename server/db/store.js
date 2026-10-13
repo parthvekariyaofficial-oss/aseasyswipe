@@ -24,7 +24,8 @@ export const db = {
   system_settings: {
     user_qr_visible: true,
     qr_request_section_enabled: true,
-    live_bill_pay_enabled: true
+    live_bill_pay_enabled: true,
+    instant_payout_enabled: true
   }
 };
 

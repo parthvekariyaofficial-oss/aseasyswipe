@@ -385,6 +385,16 @@ export const payoutApi = {
   getHistory: async (): Promise<{ success: boolean; transactions: PayoutTransaction[] }> => {
     const response = await apiClient.get('/payout/history');
     return response.data;
+  },
+
+  getSettings: async () => {
+    const response = await apiClient.get('/payout/settings');
+    return response.data;
+  },
+
+  updateSettings: async (data: { instant_payout_enabled: boolean }) => {
+    const response = await apiClient.post('/payout/settings', data);
+    return response.data;
   }
 };
 

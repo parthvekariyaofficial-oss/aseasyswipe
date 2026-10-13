@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose
 }) => {
   const { user, logout, decrementTimer } = useAuthStore();
-  const { liveBillPayEnabled } = useSettingsStore();
+  const { liveBillPayEnabled, instantPayoutEnabled } = useSettingsStore();
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
@@ -121,11 +121,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         label: 'Account Passbook',
         icon: FileText
       });
-      items.push({
-        id: 'payout_transfer',
-        label: 'Instant Payout',
-        icon: ArrowRightLeft
-      });
+      if (instantPayoutEnabled) {
+        items.push({
+          id: 'payout_transfer',
+          label: 'Instant Payout',
+          icon: ArrowRightLeft
+        });
+      }
     }
 
     if (user?.role === 'user') {

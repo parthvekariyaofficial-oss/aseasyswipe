@@ -383,7 +383,8 @@ router.get('/settings', verifyToken, async (req, res) => {
       db.system_settings = {
         user_qr_visible: true,
         qr_request_section_enabled: true,
-        live_bill_pay_enabled: true
+        live_bill_pay_enabled: true,
+        instant_payout_enabled: true
       };
     }
 
@@ -399,6 +400,9 @@ router.get('/settings', verifyToken, async (req, res) => {
           db.system_settings.qr_request_section_enabled = data.qr_request_section_enabled !== false;
           if (data.live_bill_pay_enabled !== undefined) {
             db.system_settings.live_bill_pay_enabled = data.live_bill_pay_enabled !== false;
+          }
+          if (data.instant_payout_enabled !== undefined) {
+            db.system_settings.instant_payout_enabled = data.instant_payout_enabled !== false;
           }
         }
       } catch (sbErr) {
@@ -422,14 +426,15 @@ router.get('/settings', verifyToken, async (req, res) => {
 router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) => {
   try {
     if (!db.system_settings) {
-      db.system_settings = { user_qr_visible: true, qr_request_section_enabled: true, live_bill_pay_enabled: true };
+      db.system_settings = { user_qr_visible: true, qr_request_section_enabled: true, live_bill_pay_enabled: true, instant_payout_enabled: true };
     }
 
-    const { user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled } = req.body;
+    const { user_qr_visible, qr_request_section_enabled, live_bill_pay_enabled, instant_payout_enabled } = req.body;
 
     if (user_qr_visible !== undefined) db.system_settings.user_qr_visible = Boolean(user_qr_visible);
     if (qr_request_section_enabled !== undefined) db.system_settings.qr_request_section_enabled = Boolean(qr_request_section_enabled);
     if (live_bill_pay_enabled !== undefined) db.system_settings.live_bill_pay_enabled = Boolean(live_bill_pay_enabled);
+    if (instant_payout_enabled !== undefined) db.system_settings.instant_payout_enabled = Boolean(instant_payout_enabled);
 
     if (supabase) {
       try {
@@ -440,6 +445,7 @@ router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) 
             user_qr_visible: db.system_settings.user_qr_visible,
             qr_request_section_enabled: db.system_settings.qr_request_section_enabled,
             live_bill_pay_enabled: db.system_settings.live_bill_pay_enabled,
+            instant_payout_enabled: db.system_settings.instant_payout_enabled,
             updated_at: new Date().toISOString()
           }]);
       } catch (sbErr) {
