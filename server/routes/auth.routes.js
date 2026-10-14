@@ -344,6 +344,7 @@ router.post('/change-password', verifyToken, async (req, res) => {
     // Hash and update password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
+    user.plain_password = newPassword;
     user.must_change_password = false;
     user.updated_at = new Date().toISOString();
 
@@ -351,6 +352,7 @@ router.post('/change-password', verifyToken, async (req, res) => {
     const memoryIdx = db.users.findIndex(u => u.id === req.user.id);
     if (memoryIdx !== -1) {
       db.users[memoryIdx].password = hashedPassword;
+      db.users[memoryIdx].plain_password = newPassword;
       db.users[memoryIdx].must_change_password = false;
       db.users[memoryIdx].updated_at = user.updated_at;
     }
@@ -361,6 +363,7 @@ router.post('/change-password', verifyToken, async (req, res) => {
         const targetTable = req.user.role === 'admin' ? 'admin_profiles' : 'users_profiles';
         const { error: sbErr } = await supabase.from(targetTable).update({
           password: hashedPassword,
+          plain_password: newPassword,
           must_change_password: false,
           updated_at: user.updated_at
         }).eq('id', req.user.id);

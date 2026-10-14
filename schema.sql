@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.users_profiles (
 );
 
 -- Ensure columns exist if table was already created in earlier versions
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS plain_password TEXT DEFAULT 'Password@123';
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS tpin VARCHAR(4) DEFAULT '1234';
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS tpin_set BOOLEAN DEFAULT false;
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';

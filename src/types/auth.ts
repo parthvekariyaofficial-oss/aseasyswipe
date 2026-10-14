@@ -21,6 +21,7 @@ export interface UserProfile {
   hold_balance: number;
   commission_balance: number;
   t_plus_one_balance: number;
+  plain_password?: string;
   tpin?: string;
   tpin_set?: boolean;
   tpin_attempts?: number;

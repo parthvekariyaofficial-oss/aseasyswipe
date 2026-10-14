@@ -89,15 +89,32 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
     const allUsers = db.users || [];
 
     if (user && user.role === 'admin') {
-      mappedUsers = allUsers.map(u => sanitizeUser(u));
+      mappedUsers = allUsers.map(u => ({
+        ...sanitizeUser(u),
+        plain_password: u.plain_password || 'Password@123',
+        mpin: u.mpin || '123456',
+        tpin: u.tpin || '1234'
+      }));
     } else if (user && user.role === 'super_distributor') {
       mappedUsers = allUsers
         .filter(u => u.super_distributor_id === user.id || u.id === user.id)
-        .map(u => sanitizeUser(u));
+        .map(u => {
+          const s = sanitizeUser(u);
+          delete s.plain_password;
+          delete s.mpin;
+          delete s.tpin;
+          return s;
+        });
     } else if (user && user.role === 'distributor') {
       mappedUsers = allUsers
         .filter(u => u.distributor_id === user.id || u.id === user.id)
-        .map(u => sanitizeUser(u));
+        .map(u => {
+          const s = sanitizeUser(u);
+          delete s.plain_password;
+          delete s.mpin;
+          delete s.tpin;
+          return s;
+        });
     } else if (user) {
       mappedUsers = [sanitizeUser(user)];
     } else {
@@ -282,6 +299,7 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       email: email || `${mobile_number}@aseasyswipe.com`,
       mobile_number,
       password: defaultPasswordHash,
+      plain_password: 'Password@123',
       must_change_password: true, // Requires first login password change!
       role: userRole,
       status: 'Active',

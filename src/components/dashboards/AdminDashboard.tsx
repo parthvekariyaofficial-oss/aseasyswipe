@@ -4,7 +4,8 @@ import type { UserProfile } from '../../types/auth';
 import { AddUserModal } from '../common/AddUserModal';
 import { 
   ShieldAlert, CheckCircle, Wallet, Search, Filter, 
-  UserPlus, RefreshCw, Users, Lock, Activity, Edit, Trash2, Calendar, Building2
+  UserPlus, RefreshCw, Users, Lock, Activity, Edit, Trash2, Calendar, Building2,
+  Key, KeyRound, Eye, EyeOff, Copy, Check, ShieldCheck, X
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -25,6 +26,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onTabChange }) =
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+
+  // Credentials View Modal State
+  const [viewingCredentialsUser, setViewingCredentialsUser] = useState<UserProfile | null>(null);
+  const [showCredentialsPassword, setShowCredentialsPassword] = useState(false);
+  const [showCredentialsMpin, setShowCredentialsMpin] = useState(false);
+  const [showCredentialsTpin, setShowCredentialsTpin] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopyCredential = (val: string, fieldName: string) => {
+    navigator.clipboard.writeText(val);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -380,6 +394,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onTabChange }) =
                             />
                           </button>
 
+                          {/* VIEW SECURITY CREDENTIALS ICON (PASSWORD, MPIN, TPIN) */}
+                          <button
+                            onClick={() => {
+                              setViewingCredentialsUser(u);
+                              setShowCredentialsPassword(false);
+                              setShowCredentialsMpin(false);
+                              setShowCredentialsTpin(false);
+                              setCopiedField(null);
+                            }}
+                            title="View Credentials (Password, MPIN, TPIN)"
+                            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-400 hover:text-purple-300 border border-slate-700/60 transition cursor-pointer"
+                          >
+                            <Key className="w-4 h-4" />
+                          </button>
+
                           {/* EDIT ICON */}
                           <button
                             onClick={() => setEditingUser(u)}
@@ -468,6 +497,192 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onTabChange }) =
         distributors={users.filter(u => u.role === 'distributor')}
         allUsers={users}
       />
+
+      {/* USER SECURITY CREDENTIALS VIEW MODAL (VIEW ONLY FOR ADMIN) */}
+      {viewingCredentialsUser && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setViewingCredentialsUser(null)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-6 shadow-2xl relative overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Background Ambient Glow */}
+            <div className="absolute -top-16 -right-16 w-52 h-52 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400">
+                  <Key className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      Security Credentials
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      View Only
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    <strong className="text-white">{viewingCredentialsUser.name}</strong> ({viewingCredentialsUser.firm_name})
+                  </p>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Mobile: {viewingCredentialsUser.mobile_number}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingCredentialsUser(null)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                title="Close Modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Confidential Access Badge */}
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2.5 text-xs text-slate-300">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-[11px] text-slate-400">
+                Authorized Admin Confidential View. Admin cannot edit credentials from here.
+              </span>
+            </div>
+
+            {/* 3 CREDENTIALS CARDS: PASSWORD, 6-DIGIT MPIN, 4-DIGIT TPIN */}
+            <div className="space-y-3.5">
+              
+              {/* 1. LOGIN PASSWORD */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-indigo-400" /> Account Login Password
+                  </span>
+                  <span className="text-[9px] uppercase font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                    Login Secret
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <span className="text-base font-mono font-bold text-white tracking-wider select-all truncate">
+                    {showCredentialsPassword ? (viewingCredentialsUser.plain_password || 'Password@123') : '••••••••'}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCredentialsPassword(!showCredentialsPassword)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title={showCredentialsPassword ? 'Hide Password' : 'Show Password'}
+                    >
+                      {showCredentialsPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCredential(viewingCredentialsUser.plain_password || 'Password@123', 'password')}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Copy Password"
+                    >
+                      {copiedField === 'password' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. 6-DIGIT LOGIN MPIN */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-purple-400" /> 6-Digit Login MPIN
+                  </span>
+                  <span className="text-[9px] uppercase font-bold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                    2-Step Login PIN
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <span className="text-base font-mono font-bold text-white tracking-widest select-all">
+                    {showCredentialsMpin ? (viewingCredentialsUser.mpin || '123456') : '••••••'}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCredentialsMpin(!showCredentialsMpin)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title={showCredentialsMpin ? 'Hide MPIN' : 'Show MPIN'}
+                    >
+                      {showCredentialsMpin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCredential(viewingCredentialsUser.mpin || '123456', 'mpin')}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Copy MPIN"
+                    >
+                      {copiedField === 'mpin' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. 4-DIGIT FINANCIAL TPIN */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-emerald-400" /> 4-Digit Financial TPIN
+                  </span>
+                  <span className="text-[9px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    Bill Pay & Payout PIN
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <span className="text-base font-mono font-bold text-white tracking-widest select-all">
+                    {showCredentialsTpin ? (viewingCredentialsUser.tpin || '1234') : '••••'}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCredentialsTpin(!showCredentialsTpin)}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title={showCredentialsTpin ? 'Hide TPIN' : 'Show TPIN'}
+                    >
+                      {showCredentialsTpin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCredential(viewingCredentialsUser.tpin || '1234', 'tpin')}
+                      className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Copy TPIN"
+                    >
+                      {copiedField === 'tpin' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingCredentialsUser(null)}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
