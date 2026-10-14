@@ -44,7 +44,12 @@ export const authApi = {
     return response.data;
   },
 
-  changePassword: async (data: { oldPassword?: string; newPassword: string }): Promise<AuthResponse> => {
+  changePassword: async (data: { 
+    oldPassword?: string; 
+    newPassword: string;
+    verificationType?: 'old_password' | 'mpin';
+    verificationValue?: string;
+  }): Promise<AuthResponse> => {
     const response = await apiClient.post('/auth/change-password', data);
     return response.data;
   },

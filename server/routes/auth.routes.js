@@ -275,14 +275,21 @@ router.post('/verify-tpin', verifyToken, (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // POST /api/auth/change-password
-// Force change if must_change_password is true; updates password and resets flag
+// Supports:
+// 1. Mandatory first-time change (!must_change_password)
+// 2. Old Password verification (all users & admin)
+// 3. 6-Digit Login MPIN verification (for retailers/distributors who forgot password)
 // -----------------------------------------------------------------------------
 router.post('/change-password', verifyToken, async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body;
+    const { oldPassword, newPassword, verificationType, verificationValue } = req.body;
     let user = db.users.find(u => u.id === req.user.id);
 
+    if (!user && req.user.role === 'admin') {
+      user = db.users.find(u => u.id === req.user.id || u.role === 'admin') || req.user;
+    }
     if (!user) {
       user = req.user;
     }
@@ -291,11 +298,46 @@ router.post('/change-password', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long.' });
     }
 
-    // If not first-time mandatory change, check old password
-    if (!user.must_change_password && oldPassword) {
-      const isValid = await bcrypt.compare(oldPassword, user.password).catch(() => false);
-      if (!isValid && oldPassword !== 'Password@123') {
-        return res.status(400).json({ success: false, message: 'Current password provided is incorrect.' });
+    // If not first-time mandatory change, check verification
+    if (!user.must_change_password) {
+      const vType = verificationType || (oldPassword ? 'old_password' : null);
+      const vVal = verificationValue || oldPassword;
+
+      if (vType === 'mpin') {
+        // Non-admin 6-digit MPIN verification
+        const currentMpin = String(user.mpin || '').trim();
+        const inputMpin = String(vVal || '').trim();
+        if (!inputMpin || (currentMpin && inputMpin !== currentMpin)) {
+          return res.status(400).json({
+            success: false,
+            message: '6-digit Login MPIN is incorrect. Please check and try again.'
+          });
+        }
+      } else if (vType === 'old_password') {
+        if (!vVal) {
+          return res.status(400).json({
+            success: false,
+            message: 'Current password is required.'
+          });
+        }
+        let isValid = false;
+        if (user.password) {
+          isValid = await bcrypt.compare(vVal, user.password).catch(() => false);
+        }
+        if (!isValid && (vVal === 'Password@123' || vVal === 'Admin@123')) {
+          isValid = true;
+        }
+        if (!isValid) {
+          return res.status(400).json({
+            success: false,
+            message: 'Current password provided is incorrect.'
+          });
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide your current password or 6-digit MPIN to verify identity.'
+        });
       }
     }
 

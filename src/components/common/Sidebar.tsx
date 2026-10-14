@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { 
-  LogOut, Users, ChevronRight, X, Key, KeyRound, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck, Images
+  LogOut, Users, ChevronRight, X, Key, KeyRound, Lock, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck, Images
 } from 'lucide-react';
 
 export interface SidebarNavItem {
@@ -113,6 +113,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'qr_master',
           label: 'QR Master',
           icon: QrCode
+        },
+        {
+          id: 'change_password',
+          label: 'Change Password',
+          icon: Key
         }
       ];
     }
@@ -147,6 +152,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         id: 'change_mpin',
         label: 'Change 6-Digit MPIN',
         icon: KeyRound
+      });
+      items.push({
+        id: 'change_password',
+        label: 'Change Password',
+        icon: Lock
       });
     }
 
