@@ -21,6 +21,7 @@ export const db = {
   ],
   payout_transactions: [],
   wallet_ledger: [],
+  kyc_verifications: [],
   system_settings: {
     user_qr_visible: true,
     qr_request_section_enabled: true,

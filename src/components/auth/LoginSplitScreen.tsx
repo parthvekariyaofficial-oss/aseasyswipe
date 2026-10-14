@@ -32,11 +32,31 @@ export const LoginSplitScreen: React.FC<LoginSplitScreenProps> = ({ onOpenResetP
     setBlockedReason(null);
 
     try {
-      const res = await authApi.login({ mobile_number: mobileNumber, password });
-      if (res.success && res.token && res.user) {
-        setAuth(res.user, res.token, res.must_change_password);
+      if (loginStep === 'password') {
+        const res = await authApi.login({ mobile_number: mobileNumber, password });
+        if (res.require_mpin_verify) {
+          setLoginStep('mpin_verify');
+          setUserName(res.user_name || 'Merchant');
+          setMpin('');
+        } else if (res.success && res.token && res.user) {
+          setAuth(res.user, res.token, res.must_change_password);
+        } else {
+          setErrorMessage(res.message || 'Authentication failed.');
+        }
       } else {
-        setErrorMessage(res.message || 'Authentication failed.');
+        // Step 2: MPIN Verify
+        if (!mpin || mpin.length !== 6) {
+          setErrorMessage('Please enter your 6-digit MPIN.');
+          setLoading(false);
+          return;
+        }
+
+        const res = await authApi.login({ mobile_number: mobileNumber, password, mpin });
+        if (res.success && res.token && res.user) {
+          setAuth(res.user, res.token, res.must_change_password);
+        } else {
+          setErrorMessage(res.message || 'MPIN verification failed.');
+        }
       }
     } catch (err: any) {
       const resp = err.response?.data;

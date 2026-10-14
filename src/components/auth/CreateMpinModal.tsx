@@ -38,7 +38,7 @@ export const CreateMpinModal: React.FC<CreateMpinModalProps> = ({
 
     try {
       const res = await authApi.createMpin(mpin);
-      const updatedProfile = { ...(res.user || user), mpin };
+      const updatedProfile = { ...(res.user || user), mpin, mpin_set: true };
       updateUser(updatedProfile);
       if (onSuccess) onSuccess();
     } catch (err: any) {

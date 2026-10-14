@@ -16,6 +16,7 @@ import bankRoutes from './routes/bank.routes.js';
 import billRequestRoutes from './routes/billRequest.routes.js';
 import payoutRoutes from './routes/payout.routes.js';
 import statementRoutes from './routes/statement.routes.js';
+import kycRoutes from './routes/kyc.routes.js';
 import './db/supabase.js';
 
 dotenv.config();
@@ -60,6 +61,7 @@ app.use('/api/bank', bankRoutes);
 app.use('/api/bill-request', billRequestRoutes);
 app.use('/api/payout', payoutRoutes);
 app.use('/api/statement', statementRoutes);
+app.use('/api/kyc', kycRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

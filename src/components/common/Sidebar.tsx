@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { 
-  LogOut, Users, ChevronRight, X, Key, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft
+  LogOut, Users, ChevronRight, X, Key, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck
 } from 'lucide-react';
 
 export interface SidebarNavItem {
@@ -68,6 +68,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'users',
           label: 'User Accounts',
           icon: Users
+        },
+        {
+          id: 'admin_kyc',
+          label: 'KYC Verification',
+          icon: ShieldCheck
         },
         {
           id: 'qr_requests',

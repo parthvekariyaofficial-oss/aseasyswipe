@@ -6,6 +6,7 @@ import { Sidebar } from './components/common/Sidebar';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { LoginSplitScreen } from './components/auth/LoginSplitScreen';
 import { ForceChangePasswordModal } from './components/auth/ForceChangePasswordModal';
+import { CreateMpinModal } from './components/auth/CreateMpinModal';
 import { ResetPinOtpModal } from './components/auth/ResetPinOtpModal';
 import { AdminDashboard } from './components/dashboards/AdminDashboard';
 import { AdminOverviewDashboard } from './components/dashboards/AdminOverviewDashboard';
@@ -24,6 +25,9 @@ import { UserPayoutTransfer } from './components/payout/UserPayoutTransfer';
 import { UserAccountStatement } from './components/statement/UserAccountStatement';
 import { AdminMasterStatement } from './components/statement/AdminMasterStatement';
 import { LandingPage } from './components/home/LandingPage';
+import { KycUploadScreen } from './components/kyc/KycUploadScreen';
+import { KycUnderReviewScreen } from './components/kyc/KycUnderReviewScreen';
+import { AdminKycManagement } from './components/kyc/AdminKycManagement';
 import type { UserRole } from './types/auth';
 import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
 
@@ -53,6 +57,9 @@ export default function App() {
       if (role === 'admin') return 'admin_bill_requests';
       return 'bill_request';
     }
+    if (p.includes('admin-kyc') || p.includes('admin_kyc') || p.includes('kyc')) {
+      return role === 'admin' ? 'admin_kyc' : 'users';
+    }
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
     if (p.includes('qr-requests') || p.includes('qr_requests')) return 'qr_requests';
     if (p.includes('users')) return 'users';
@@ -62,6 +69,7 @@ export default function App() {
 
   const getPathFromTab = (tab: string): string => {
     if (tab === 'dashboard') return '/dashboard';
+    if (tab === 'admin_kyc') return '/admin-kyc';
     if (tab === 'admin_payout') return '/admin-payout';
     if (tab === 'payout_transfer') return '/payout';
     if (tab === 'admin_statement') return '/admin-statement';
@@ -219,6 +227,8 @@ export default function App() {
         return role === 'admin' ? 'Overview & Earnings' : 'Dashboard Overview';
       case 'users':
         return role === 'admin' ? 'User Accounts' : 'Dashboard & Account';
+      case 'admin_kyc':
+        return 'KYC Verification Requests';
       case 'qr_requests':
         return 'QR Payment Requests';
       case 'admin_bill_requests':
@@ -251,7 +261,7 @@ export default function App() {
       case 'admin':
         return (
           <ProtectedRoute allowedRoles={['admin']}>
-            <AdminDashboard />
+            <AdminDashboard onTabChange={handleTabChange} />
           </ProtectedRoute>
         );
       case 'super_distributor':
@@ -311,6 +321,24 @@ export default function App() {
   // 2. Force Change Password Guard
   if (user.must_change_password) {
     return <ForceChangePasswordModal isOpen={true} user={user} />;
+  }
+
+  // 3. Mandatory 6-Digit MPIN Setup Guard (Applies to Retailer, Distributor, Super Distributor - NOT Admin)
+  if (user.role !== 'admin' && !user.mpin_set) {
+    return <CreateMpinModal isOpen={true} user={user} />;
+  }
+
+  // 4. Mandatory KYC Guard (Applies to all non-admin users: Retailer, Distributor, Super Distributor)
+  if (user.role !== 'admin') {
+    const kycStatus = user.kyc_status || 'not_submitted';
+
+    if (kycStatus !== 'verified') {
+      if (kycStatus === 'under_review' || kycStatus === 'pending') {
+        return <KycUnderReviewScreen user={user} />;
+      }
+      // 'not_submitted' or 'rejected'
+      return <KycUploadScreen user={user} />;
+    }
   }
 
   return (
@@ -470,10 +498,15 @@ export default function App() {
           {activeTab === 'bill_request' && (
             <UserBillPaymentRequest />
           )}
+          {activeTab === 'admin_kyc' && (
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminKycManagement />
+            </ProtectedRoute>
+          )}
           {activeTab === 'qr_master' && <QRMasterManagement />}
           {activeTab === 'qr_requests' && <QRPaymentRequests />}
           {activeTab === 'users' && renderDashboardByRole(user.role)}
-          {activeTab !== 'dashboard' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'users' && renderDashboardByRole(user.role)}
+          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
 

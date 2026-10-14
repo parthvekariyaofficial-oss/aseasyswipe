@@ -12,7 +12,7 @@ interface AdminDashboardProps {
   onTabChange?: (tab: string) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onTabChange }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,7 +129,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   const totalPlatformBalance = nonAdminUsers.reduce((acc, u) => acc + (u.wallet_balance || 0), 0);
   const activeCount = nonAdminUsers.filter(u => u.status === 'Active').length;
   const blockedCount = nonAdminUsers.filter(u => u.status === 'Blocked').length;
-  const pendingKycCount = nonAdminUsers.filter(u => u.kyc_status === 'pending').length;
+  const pendingKycCount = nonAdminUsers.filter(u => u.kyc_status === 'under_review' || u.kyc_status === 'pending').length;
 
   return (
     <div className="space-y-6 w-full pb-10">
@@ -180,12 +180,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex items-center justify-between">
+        <div 
+          onClick={() => onTabChange?.('admin_kyc')}
+          className="bg-slate-900 rounded-2xl p-4 border border-slate-800 hover:border-amber-500/40 cursor-pointer transition flex items-center justify-between group shadow-sm"
+        >
           <div>
-            <p className="text-xs font-semibold text-slate-400">Pending KYC Submissions</p>
+            <p className="text-xs font-semibold text-slate-400 group-hover:text-amber-400 transition">Pending KYC Submissions</p>
             <p className="text-xl font-bold text-amber-400 mt-1">{pendingKycCount}</p>
           </div>
-          <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:scale-105 transition">
             <Activity className="w-6 h-6" />
           </div>
         </div>
@@ -336,13 +339,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
 
                       {/* STATUS */}
                       <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                          u.status === 'Blocked' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                          'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }`}>
-                          {u.status}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            u.status === 'Active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                            u.status === 'Blocked' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                            'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {u.status}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                            u.kyc_status === 'verified'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : (u.kyc_status === 'under_review' || u.kyc_status === 'pending')
+                              ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20 animate-pulse'
+                              : u.kyc_status === 'rejected'
+                              ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}>
+                            {u.kyc_status === 'verified' ? '✓ KYC Verified' : (u.kyc_status === 'under_review' || u.kyc_status === 'pending') ? '⏳ KYC Review' : u.kyc_status === 'rejected' ? '✕ KYC Rejected' : 'KYC Pending'}
+                          </span>
+                        </div>
                       </td>
 
                       {/* ACTIONS */}

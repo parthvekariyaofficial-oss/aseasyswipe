@@ -427,6 +427,40 @@ export const statementApi = {
   }
 };
 
+export const kycApi = {
+  submitKyc: async (data: {
+    pan_card_url: string;
+    aadhaar_front_url: string;
+    aadhaar_back_url: string;
+    firm_selfie_url: string;
+    cheque_url: string;
+  }) => {
+    const response = await apiClient.post('/kyc/submit', data);
+    return response.data;
+  },
+
+  getMyKycStatus: async () => {
+    const response = await apiClient.get('/kyc/my-status');
+    return response.data;
+  },
+
+  getAdminKycRequests: async () => {
+    const response = await apiClient.get('/kyc/admin/requests');
+    return response.data;
+  },
+
+  reviewKycRequest: async (data: {
+    kyc_id?: string;
+    user_id: string;
+    action: 'approve' | 'reject';
+    rejection_reason?: string;
+  }) => {
+    const response = await apiClient.post('/kyc/admin/action', data);
+    return response.data;
+  }
+};
+
+
 
 
 

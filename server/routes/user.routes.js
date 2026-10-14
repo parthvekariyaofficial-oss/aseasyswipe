@@ -290,9 +290,12 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       commission_balance: 0.00,
       tpin: '1234',
       mpin: '123456',
+      mpin_set: false,
       qr_charge_percent: userChargePct,
       distributor_id: distId,
       super_distributor_id: superDistId,
+      kyc_status: userRole === 'admin' ? 'verified' : 'not_submitted',
+      kyc_rejection_reason: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -309,6 +312,9 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
           delete payload.qr_charge_percent;
           delete payload.distributor_id;
           delete payload.super_distributor_id;
+          delete payload.kyc_status;
+          delete payload.kyc_rejection_reason;
+          delete payload.mpin_set;
         }
         const { error: sbErr } = await supabase.from(targetTable).insert([payload]);
         if (sbErr) {

@@ -19,12 +19,22 @@ CREATE TABLE IF NOT EXISTS public.users_profiles (
     commission_balance NUMERIC(15,2) DEFAULT 0.00,
     tpin VARCHAR(4) NOT NULL DEFAULT '1234',
     mpin VARCHAR(6) DEFAULT '123456',
+    mpin_set BOOLEAN DEFAULT false,
     qr_charge_percent NUMERIC(5,2) DEFAULT 0.50, -- % Charge cut per QR payment
     distributor_id TEXT REFERENCES public.users_profiles(id) ON DELETE SET NULL,
     super_distributor_id TEXT REFERENCES public.users_profiles(id) ON DELETE SET NULL,
+    kyc_status TEXT CHECK (kyc_status IN ('not_submitted', 'under_review', 'verified', 'rejected')) DEFAULT 'not_submitted',
+    kyc_rejection_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure columns exist if table was already created in earlier versions
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin_set BOOLEAN DEFAULT false;
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS kyc_status TEXT CHECK (kyc_status IN ('not_submitted', 'under_review', 'verified', 'rejected')) DEFAULT 'not_submitted';
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT;
+
 
 -- 1B. ADMIN PROFILES TABLE (Separate Dedicated Admin Accounts SQL Table - No TPIN)
 CREATE TABLE IF NOT EXISTS public.admin_profiles (
@@ -441,5 +451,30 @@ CREATE TABLE IF NOT EXISTS public.wallet_ledger (
 CREATE INDEX IF NOT EXISTS idx_ledger_user ON public.wallet_ledger(user_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_created ON public.wallet_ledger(created_at);
 ALTER TABLE IF EXISTS public.wallet_ledger DISABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- 13. KYC VERIFICATIONS TABLE (User Document Uploads & Admin Approval)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.kyc_verifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users_profiles(id) ON DELETE CASCADE,
+    pan_card_url TEXT NOT NULL,
+    aadhaar_front_url TEXT NOT NULL,
+    aadhaar_back_url TEXT NOT NULL,
+    firm_selfie_url TEXT NOT NULL,
+    cheque_url TEXT NOT NULL,
+    status TEXT CHECK (status IN ('under_review', 'verified', 'rejected')) DEFAULT 'under_review',
+    rejection_reason TEXT,
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    reviewed_by TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_kyc_user_id ON public.kyc_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_kyc_status ON public.kyc_verifications(status);
+ALTER TABLE IF EXISTS public.kyc_verifications DISABLE ROW LEVEL SECURITY;
+
 
 

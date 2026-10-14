@@ -125,7 +125,40 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Password verified! Direct login without MPIN requirement
+    // Check if user is non-admin and requires MPIN verification:
+    // Admin always logs in with password only (single-step).
+    // User / Distributor / Super Distributor requires 6-digit MPIN once MPIN is set!
+    if (user.role !== 'admin' && !user.must_change_password && user.mpin_set) {
+      if (!mpin) {
+        // Step 1 passed, prompt client for Step 2 (6-digit MPIN)
+        return res.status(200).json({
+          success: true,
+          require_mpin_verify: true,
+          user_name: user.name,
+          mobile_number: user.mobile_number
+        });
+      }
+
+      // Step 2: Verify 6-digit MPIN
+      const cleanMpin = String(mpin).trim();
+      const userMpin = String(user.mpin || '123456').trim();
+
+      if (cleanMpin !== userMpin) {
+        attemptInfo.attempts += 1;
+        if (attemptInfo.attempts >= 5) {
+          attemptInfo.lockedUntil = Date.now() + 15 * 60 * 1000;
+        }
+        db.loginAttempts[mobile_number] = attemptInfo;
+
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid 6-digit MPIN. Please try again.',
+          attemptsLeft: Math.max(0, 5 - attemptInfo.attempts)
+        });
+      }
+    }
+
+    // Password & MPIN verified! Direct login
     delete db.loginAttempts[mobile_number];
 
     const token = jwt.sign(
@@ -303,6 +336,65 @@ router.post('/change-password', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Change Password Error:', error);
     return res.status(500).json({ success: false, message: 'Server error during password update.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/auth/create-mpin
+// Sets user's 6-digit MPIN and marks mpin_set = true
+// -----------------------------------------------------------------------------
+router.post('/create-mpin', verifyToken, async (req, res) => {
+  try {
+    const { mpin } = req.body;
+
+    if (!mpin || String(mpin).length !== 6 || !/^\d{6}$/.test(String(mpin))) {
+      return res.status(400).json({
+        success: false,
+        message: 'MPIN must be exactly 6 numeric digits.'
+      });
+    }
+
+    const cleanMpin = String(mpin).trim();
+    const nowIso = new Date().toISOString();
+
+    let user = db.users.find(u => u.id === req.user.id);
+    if (!user) user = req.user;
+
+    user.mpin = cleanMpin;
+    user.mpin_set = true;
+    user.updated_at = nowIso;
+
+    // Update in-memory db.users
+    const memoryIdx = db.users.findIndex(u => u.id === req.user.id);
+    if (memoryIdx !== -1) {
+      db.users[memoryIdx].mpin = cleanMpin;
+      db.users[memoryIdx].mpin_set = true;
+      db.users[memoryIdx].updated_at = nowIso;
+    }
+
+    // Update Supabase PostgreSQL database
+    if (supabase) {
+      try {
+        const targetTable = req.user.role === 'admin' ? 'admin_profiles' : 'users_profiles';
+        const { error: sbErr } = await supabase.from(targetTable).update({
+          mpin: cleanMpin,
+          mpin_set: true,
+          updated_at: nowIso
+        }).eq('id', req.user.id);
+        if (sbErr) console.error('Supabase Set MPIN Error:', sbErr);
+      } catch (sbErr) {
+        console.error('Supabase Catch Set MPIN Error:', sbErr);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: '6-digit MPIN successfully created!',
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    console.error('Create MPIN Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while saving MPIN.' });
   }
 });
 
