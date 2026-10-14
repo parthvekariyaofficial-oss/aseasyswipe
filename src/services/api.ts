@@ -105,6 +105,19 @@ export const userApi = {
     return response.data;
   },
 
+  getAdminBadgeCounts: async (): Promise<{
+    success: boolean;
+    counts: {
+      qr_requests: number;
+      admin_bill_requests: number;
+      admin_kyc: number;
+      total: number;
+    };
+  }> => {
+    const response = await apiClient.get('/user/admin-badge-counts');
+    return response.data;
+  },
+
   updateStatus: async (data: { targetUserId: string; newStatus?: string; walletAdjustAmount?: number }): Promise<{ success: boolean; message: string; user: UserProfile }> => {
     const response = await apiClient.patch('/user/status', data);
     return response.data;

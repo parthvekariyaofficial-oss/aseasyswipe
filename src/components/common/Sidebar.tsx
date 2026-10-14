@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { userApi } from '../../services/api';
 import { 
   LogOut, Users, ChevronRight, X, Key, KeyRound, Lock, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck, Images
 } from 'lucide-react';
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { user, logout, decrementTimer } = useAuthStore();
   const { liveBillPayEnabled, instantPayoutEnabled, ccBillPayEnabled } = useSettingsStore();
+  const [badgeCounts, setBadgeCounts] = React.useState<{ [key: string]: number }>({});
 
   const getRoleLabel = (role?: string) => {
     switch (role) {
@@ -56,6 +58,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => clearInterval(interval);
   }, [decrementTimer]);
 
+  // Real-time polling for live request badge counts (Admin only)
+  React.useEffect(() => {
+    if (user?.role !== 'admin') return;
+
+    const fetchBadgeCounts = async () => {
+      try {
+        const res = await userApi.getAdminBadgeCounts();
+        if (res.success && res.counts) {
+          setBadgeCounts(res.counts);
+        }
+      } catch {
+        // Silent catch for background poll
+      }
+    };
+
+    fetchBadgeCounts();
+    const interval = setInterval(fetchBadgeCounts, 3000);
+    return () => clearInterval(interval);
+  }, [user?.role]);
+
   const getNavItems = (): SidebarNavItem[] => {
     if (user?.role === 'admin') {
       return [
@@ -72,12 +94,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'admin_kyc',
           label: 'KYC Verification',
-          icon: ShieldCheck
+          icon: ShieldCheck,
+          badge: badgeCounts['admin_kyc'],
+          badgeColor: 'bg-emerald-500 text-slate-950 shadow-emerald-500/30'
         },
         {
           id: 'qr_requests',
           label: 'QR Payment Requests',
-          icon: FileText
+          icon: FileText,
+          badge: badgeCounts['qr_requests'],
+          badgeColor: 'bg-amber-500 text-slate-950 shadow-amber-500/30'
         },
         {
           id: 'qr_gallery',
@@ -87,7 +113,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'admin_bill_requests',
           label: 'CC Bill Requests',
-          icon: CreditCard
+          icon: CreditCard,
+          badge: badgeCounts['admin_bill_requests'],
+          badgeColor: 'bg-rose-500 text-white shadow-rose-500/30'
         },
         {
           id: 'live_bill_history',
@@ -312,7 +340,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </div>
 
-                <ChevronRight className={`w-4 h-4 transition-transform flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:translate-x-1 group-hover:text-white'}`} />
+                <div className="flex items-center gap-2 shrink-0">
+                  {item.badge !== undefined && Number(item.badge) > 0 && (
+                    <span className={`
+                      px-2 py-0.5 rounded-full text-[10px] font-black font-mono shadow-md animate-pulse
+                      ${item.badgeColor || 'bg-rose-500 text-white'}
+                    `}>
+                      {item.badge}
+                    </span>
+                  )}
+                  <ChevronRight className={`w-4 h-4 transition-transform flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:translate-x-1 group-hover:text-white'}`} />
+                </div>
               </button>
             );
           })}

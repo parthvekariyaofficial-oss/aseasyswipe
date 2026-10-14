@@ -68,6 +68,54 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/user/admin-badge-counts
+// Live pending counts for QR payment requests, CC bill requests, and KYC verifications
+router.get('/admin-badge-counts', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.json({ success: true, counts: { qr_requests: 0, admin_bill_requests: 0, admin_kyc: 0, total: 0 } });
+    }
+
+    let qrPendingCount = 0;
+    let ccBillPendingCount = 0;
+    let kycPendingCount = 0;
+
+    if (supabase) {
+      try {
+        const [qrRes, ccRes, kycRes] = await Promise.all([
+          supabase.from('qr_payment_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('credit_card_bill_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('kyc_verifications').select('id', { count: 'exact', head: true }).in('status', ['under_review', 'pending'])
+        ]);
+        qrPendingCount = qrRes.count || 0;
+        ccBillPendingCount = ccRes.count || 0;
+        kycPendingCount = kycRes.count || 0;
+      } catch (sbErr) {
+        qrPendingCount = (db.qr_payment_requests || []).filter(r => r.status === 'pending').length;
+        ccBillPendingCount = (db.credit_card_bill_requests || []).filter(r => r.status === 'pending').length;
+        kycPendingCount = (db.kyc_verifications || []).filter(k => k.status === 'under_review' || k.status === 'pending').length;
+      }
+    } else {
+      qrPendingCount = (db.qr_payment_requests || []).filter(r => r.status === 'pending').length;
+      ccBillPendingCount = (db.credit_card_bill_requests || []).filter(r => r.status === 'pending').length;
+      kycPendingCount = (db.kyc_verifications || []).filter(k => k.status === 'under_review' || k.status === 'pending').length;
+    }
+
+    return res.json({
+      success: true,
+      counts: {
+        qr_requests: qrPendingCount,
+        admin_bill_requests: ccBillPendingCount,
+        admin_kyc: kycPendingCount,
+        total: qrPendingCount + ccBillPendingCount + kycPendingCount
+      }
+    });
+  } catch (err) {
+    console.error('Fetch Admin Badge Counts Error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch badge counts' });
+  }
+});
+
 // GET /api/user/hierarchy
 // Returns mapped users based on role (Direct Supabase Database query)
 router.get('/hierarchy', verifyToken, async (req, res) => {
