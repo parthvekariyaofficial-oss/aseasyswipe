@@ -122,6 +122,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
     }
 
+    if (user?.role === 'user') {
+      const userItems: SidebarNavItem[] = [
+        {
+          id: 'users',
+          label: 'Dashboard & Account',
+          icon: Users
+        },
+        {
+          id: 'qr_requests',
+          label: 'QR Payment History',
+          icon: QrCode
+        }
+      ];
+
+      if (liveBillPayEnabled) {
+        userItems.push({
+          id: 'live_bill_pay',
+          label: 'Live Bill Pay',
+          icon: Zap
+        });
+      }
+
+      if (instantPayoutEnabled) {
+        userItems.push({
+          id: 'payout_transfer',
+          label: 'Instant Payout',
+          icon: ArrowRightLeft
+        });
+      }
+
+      userItems.push({
+        id: 'bill_request',
+        label: 'Credit Card Bill Pay',
+        icon: CreditCard
+      });
+
+      userItems.push({
+        id: 'user_statement',
+        label: 'Account Passbook',
+        icon: FileText
+      });
+
+      userItems.push({
+        id: 'manage_tpin',
+        label: 'Create TPIN',
+        icon: Key
+      });
+
+      userItems.push({
+        id: 'change_mpin',
+        label: 'Change MPIN',
+        icon: KeyRound
+      });
+
+      userItems.push({
+        id: 'change_password',
+        label: 'Change Password',
+        icon: Lock
+      });
+
+      return userItems;
+    }
+
     const items: SidebarNavItem[] = [
       {
         id: 'users',
@@ -166,21 +229,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Change Password',
       icon: Lock
     });
-
-    if (user?.role === 'user') {
-      if (liveBillPayEnabled) {
-        items.push({
-          id: 'live_bill_pay',
-          label: 'Live Bill Pay',
-          icon: Zap
-        });
-      }
-      items.push({
-        id: 'bill_request',
-        label: 'Credit Card Bill Pay',
-        icon: CreditCard
-      });
-    }
 
     return items;
   };
