@@ -25,8 +25,8 @@ export const AdminLiveBillPayHistory: React.FC = () => {
   const [isTogglingLiveBill, setIsTogglingLiveBill] = useState(false);
   const [toggleAlert, setToggleAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const fetchAdminHistory = async () => {
-    setLoading(true);
+  const fetchAdminHistory = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const res = await b2bApi.getHistory();
       if (res && res.status === 'success' && Array.isArray(res.data)) {
@@ -35,13 +35,17 @@ export const AdminLiveBillPayHistory: React.FC = () => {
     } catch (err) {
       console.error('Error fetching admin live bill pay history:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdminHistory();
+    fetchAdminHistory(true);
     fetchLiveBillSettings();
+    const interval = setInterval(() => {
+      fetchAdminHistory(false);
+    }, 4000);
+    return () => clearInterval(interval);
   }, [fetchLiveBillSettings]);
 
   const handleToggleLiveBill = async () => {

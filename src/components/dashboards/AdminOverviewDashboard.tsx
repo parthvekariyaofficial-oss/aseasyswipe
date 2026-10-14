@@ -49,8 +49,8 @@ export const AdminOverviewDashboard: React.FC = () => {
     }
   };
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const [reqRes, userRes, billRes, b2bRes, payoutRes, usepayRes] = await Promise.all([
         qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] })),
@@ -89,12 +89,16 @@ export const AdminOverviewDashboard: React.FC = () => {
     } catch (err) {
       console.error('Fetch Overview Data Error:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   // Helper to check if a record matches the selected date filter
@@ -285,7 +289,7 @@ export const AdminOverviewDashboard: React.FC = () => {
 
           {/* Refresh Data button */}
           <button
-            onClick={fetchData}
+            onClick={() => fetchData(true)}
             disabled={loading}
             className="p-2.5 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs transition disabled:opacity-50 shadow-sm"
             title="Refresh Data"

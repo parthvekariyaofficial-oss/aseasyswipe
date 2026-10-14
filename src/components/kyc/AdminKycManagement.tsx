@@ -22,8 +22,8 @@ export const AdminKycManagement: React.FC = () => {
   const [rejectingRequest, setRejectingRequest] = useState<KycVerificationRecord | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  const fetchRequests = async () => {
-    setLoading(true);
+  const fetchRequests = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const res = await kycApi.getAdminKycRequests();
       if (res.success && res.requests) {
@@ -32,12 +32,16 @@ export const AdminKycManagement: React.FC = () => {
     } catch (err) {
       console.error('Fetch KYC Requests Error:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRequests();
+    fetchRequests(true);
+    const interval = setInterval(() => {
+      fetchRequests(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (record: KycVerificationRecord) => {
@@ -163,7 +167,7 @@ export const AdminKycManagement: React.FC = () => {
         </div>
 
         <button
-          onClick={fetchRequests}
+          onClick={() => fetchRequests(true)}
           disabled={loading}
           className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2 border border-slate-700 transition self-start sm:self-auto"
         >

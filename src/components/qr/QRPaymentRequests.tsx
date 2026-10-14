@@ -170,6 +170,10 @@ export const QRPaymentRequests: React.FC = () => {
 
   useEffect(() => {
     fetchData(true);
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, [isAdmin]);
 
   const handleCopyUpi = (upi?: string) => {

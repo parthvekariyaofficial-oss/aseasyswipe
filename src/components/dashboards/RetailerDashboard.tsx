@@ -23,8 +23,8 @@ export const RetailerDashboard: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  const fetchUserData = async () => {
-    setLoading(true);
+  const fetchUserData = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const [reqRes, billRes, b2bRes, payoutRes] = await Promise.all([
         qrApi.getPaymentRequests().catch(() => ({ success: false, payment_requests: [] })),
@@ -48,12 +48,16 @@ export const RetailerDashboard: React.FC = () => {
     } catch (err) {
       console.error('Fetch User Dashboard Data Error:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUserData();
+    fetchUserData(true);
+    const interval = setInterval(() => {
+      fetchUserData(false);
+    }, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   // Helper to check if a record matches the selected date filter
@@ -220,7 +224,7 @@ export const RetailerDashboard: React.FC = () => {
 
           {/* Refresh Data button */}
           <button
-            onClick={fetchUserData}
+            onClick={() => fetchUserData(true)}
             disabled={loading}
             className="p-2.5 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-xl text-xs transition disabled:opacity-50 shadow-sm"
             title="Refresh Data"

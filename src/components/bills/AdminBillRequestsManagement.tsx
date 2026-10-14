@@ -57,9 +57,9 @@ export const AdminBillRequestsManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       fetchCcSettings();
       const [reqRes, slabRes] = await Promise.all([
         billRequestApi.getRequests().catch(() => ({ success: false, requests: [] })),
@@ -75,12 +75,16 @@ export const AdminBillRequestsManagement: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to load bill requests:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const showNotice = (type: 'success' | 'error', msg: string) => {

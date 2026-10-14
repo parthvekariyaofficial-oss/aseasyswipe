@@ -125,7 +125,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'admin_payout',
           label: 'Payout Slabs & Txns',
-          icon: ArrowRightLeft
+          icon: ArrowRightLeft,
+          badge: badgeCounts['admin_payout'],
+          badgeColor: 'bg-cyan-500 text-slate-950 shadow-cyan-500/30'
         },
         {
           id: 'admin_statement',

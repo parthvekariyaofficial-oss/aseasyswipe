@@ -138,9 +138,9 @@ export const UserBillPaymentRequest: React.FC = () => {
   const approvedCount = requests.filter(r => r.status === 'approved').length;
   const rejectedCount = requests.filter(r => r.status === 'rejected').length;
 
-  const loadData = async () => {
+  const loadData = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const [bankRes, slabRes, reqRes] = await Promise.all([
         bankApi.getBankList().catch(() => ({ success: false, banks: [] })),
         billRequestApi.getSlabs().catch(() => ({ success: false, slabs: [] })),
@@ -165,12 +165,16 @@ export const UserBillPaymentRequest: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to load bill request data:', err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    loadData(true);
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 3500);
+    return () => clearInterval(interval);
   }, []);
 
   // Recalculate charge whenever amount or slabs change
@@ -588,7 +592,7 @@ export const UserBillPaymentRequest: React.FC = () => {
             )}
 
             <button
-              onClick={loadData}
+              onClick={() => loadData(true)}
               disabled={loading}
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white transition"
               title="Refresh requests"

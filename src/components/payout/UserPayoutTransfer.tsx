@@ -172,8 +172,8 @@ export const UserPayoutTransfer: React.FC = () => {
   }, [amount]);
 
   // Fetch History
-  const fetchHistory = async () => {
-    setHistoryLoading(true);
+  const fetchHistory = async (isInitial = false) => {
+    if (isInitial) setHistoryLoading(true);
     try {
       const res = await payoutApi.getHistory();
       if (res.success && Array.isArray(res.transactions)) {
@@ -182,13 +182,17 @@ export const UserPayoutTransfer: React.FC = () => {
     } catch (err) {
       console.error('Fetch payout history error:', err);
     } finally {
-      setHistoryLoading(false);
+      if (isInitial) setHistoryLoading(false);
     }
   };
 
   useEffect(() => {
     if (activeSubTab === 'history') {
-      fetchHistory();
+      fetchHistory(true);
+      const interval = setInterval(() => {
+        fetchHistory(false);
+      }, 3500);
+      return () => clearInterval(interval);
     }
   }, [activeSubTab]);
 
@@ -696,7 +700,7 @@ export const UserPayoutTransfer: React.FC = () => {
               )}
 
               <button
-                onClick={fetchHistory}
+                onClick={() => fetchHistory(true)}
                 disabled={historyLoading}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
               >

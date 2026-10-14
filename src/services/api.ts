@@ -111,6 +111,7 @@ export const userApi = {
       qr_requests: number;
       admin_bill_requests: number;
       admin_kyc: number;
+      admin_payout?: number;
       total: number;
     };
   }> => {

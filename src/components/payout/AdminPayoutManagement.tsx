@@ -64,8 +64,8 @@ export const AdminPayoutManagement: React.FC = () => {
   };
 
   // Fetch Transactions
-  const fetchTransactions = async () => {
-    setTxnsLoading(true);
+  const fetchTransactions = async (isInitial = false) => {
+    if (isInitial) setTxnsLoading(true);
     try {
       const res = await payoutApi.getHistory();
       if (res.success && Array.isArray(res.transactions)) {
@@ -74,12 +74,12 @@ export const AdminPayoutManagement: React.FC = () => {
     } catch (err) {
       console.error('Fetch transactions error:', err);
     } finally {
-      setTxnsLoading(false);
+      if (isInitial) setTxnsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchTransactions(true);
     fetchSlabs();
     fetchPayoutSettings();
   }, [fetchPayoutSettings]);
@@ -114,7 +114,11 @@ export const AdminPayoutManagement: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'transactions') {
-      fetchTransactions();
+      fetchTransactions(false);
+      const interval = setInterval(() => {
+        fetchTransactions(false);
+      }, 3500);
+      return () => clearInterval(interval);
     }
   }, [activeTab]);
 
