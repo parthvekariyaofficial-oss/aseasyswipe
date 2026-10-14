@@ -5,7 +5,7 @@ import type { QrPaymentRequest } from '../../types/qr';
 import type { CreditCardBillRequest } from '../../types/billRequest';
 import type { PayoutTransaction } from '../../types/payout';
 import { 
-  Wallet, ShieldCheck, User, Store, Phone, CheckCircle2, 
+  ShieldCheck, User, Store, Phone, CheckCircle2, 
   ArrowUpRight, RefreshCw, Coins, Zap, CreditCard, Receipt, 
   ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, QrCode
 } from 'lucide-react';
@@ -127,35 +127,20 @@ export const RetailerDashboard: React.FC = () => {
   const totalPayoutVolume = successfulPayouts.reduce((acc, t) => acc + Number(t.amount || 0), 0);
   const totalPayoutCharges = successfulPayouts.reduce((acc, t) => acc + Number(t.slab_charge || 0), 0);
 
+  // Calculate First Name & Middle Name only for greeting
+  const nameParts = (user?.name || '').trim().split(/\s+/).filter(Boolean);
+  const displayName = nameParts.length >= 2 ? `${nameParts[0]} ${nameParts[1]}` : (user?.name || 'Retailer');
+
   return (
     <div className="space-y-6 w-full pb-10 animate-in fade-in duration-300">
-      {/* HEADER BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase">
-              Retailer Portal
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black text-white">
-              Welcome, {user?.name || 'Retailer'}
-            </h1>
-            <p className="text-xs text-slate-400">
-              Firm: <strong className="text-slate-200">{user?.firm_name}</strong> | Mobile: <span className="font-mono text-slate-300">{user?.mobile_number}</span>
-            </p>
-          </div>
-
-          <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
-            <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-              <Wallet className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Main Wallet Balance</p>
-              <p className="text-xl font-black text-white">
-                ₹{Number(user?.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* CLEAN HEADER GREETING (NO BOX BG) */}
+      <div className="space-y-1 pt-1">
+        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold uppercase tracking-wider inline-block">
+          Retailer Portal
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          Welcome, {displayName}
+        </h1>
       </div>
 
 
