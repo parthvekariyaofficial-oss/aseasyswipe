@@ -134,10 +134,7 @@ export const RetailerDashboard: React.FC = () => {
   return (
     <div className="space-y-6 w-full pb-10 animate-in fade-in duration-300">
       {/* CLEAN HEADER GREETING (NO BOX BG) */}
-      <div className="space-y-1 pt-1">
-        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold uppercase tracking-wider inline-block">
-          Retailer Portal
-        </span>
+      <div className="pt-1">
         <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
           Welcome, {displayName}
         </h1>
