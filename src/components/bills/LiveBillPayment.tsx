@@ -9,13 +9,17 @@ import {
   RefreshCw, FileText, Lock, ChevronDown, Calendar, Filter, RotateCcw, X
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useAuthStore } from '../../store/authStore';
+import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 const defaultCategoriesList: BillerCategory[] = [
   { category_id: 7, category_name: "Credit Card" }
 ];
 
 export const LiveBillPayment: React.FC = () => {
+  const { user } = useAuthStore();
   const { liveBillPayEnabled } = useSettingsStore();
+  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   // Category & Biller State (Credit Card Only - Fetched from Database)
   const [categories] = useState<BillerCategory[]>(defaultCategoriesList);
@@ -1053,24 +1057,45 @@ export const LiveBillPayment: React.FC = () => {
                   </div>
                 )}
 
-                {/* 4-Digit TPIN Input */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Enter 4-Digit TPIN <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    required
-                    placeholder="••••"
-                    value={tpin}
-                    onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1 text-center">
-                    Enter your secret 4-digit transaction PIN to authorize payment
-                  </p>
-                </div>
+                {/* 4-Digit TPIN Input / Prompt */}
+                {!user?.tpin_set ? (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-amber-300">4-Digit TPIN Required</p>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        You have not created your 4-digit Transaction PIN yet. Create it now to authorize Live Bill Pay.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateTpin(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition"
+                    >
+                      Create 4-Digit TPIN Now
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Enter 4-Digit TPIN <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      required
+                      placeholder="••••"
+                      value={tpin}
+                      onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1 text-center">
+                      Enter your secret 4-digit transaction PIN to authorize payment
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-3 pt-2">
                   <button
@@ -1082,7 +1107,7 @@ export const LiveBillPayment: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={payingBill || verifyingTpin || tpin.length !== 4 || (chargeInfo ? !chargeInfo.hasSufficientBalance : false)}
+                    disabled={!user?.tpin_set || payingBill || verifyingTpin || tpin.length !== 4 || (chargeInfo ? !chargeInfo.hasSufficientBalance : false)}
                     className="w-1/2 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition"
                   >
                     <ShieldCheck className={`w-4 h-4 ${payingBill || verifyingTpin ? 'animate-spin' : ''}`} />
@@ -1094,6 +1119,16 @@ export const LiveBillPayment: React.FC = () => {
 
           </div>
         </div>
+      )}
+
+      {/* Create TPIN Modal from Bill Pay */}
+      {showCreateTpin && (
+        <CreateTpinModal
+          isOpen={true}
+          user={user || undefined}
+          onClose={() => setShowCreateTpin(false)}
+          onSuccess={() => setShowCreateTpin(false)}
+        />
       )}
 
     </div>

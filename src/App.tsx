@@ -30,7 +30,7 @@ import { KycUploadScreen } from './components/kyc/KycUploadScreen';
 import { KycUnderReviewScreen } from './components/kyc/KycUnderReviewScreen';
 import { AdminKycManagement } from './components/kyc/AdminKycManagement';
 import type { UserRole } from './types/auth';
-import { Menu, LogOut, Wallet, Clock, ChevronDown, Key } from 'lucide-react';
+import { Menu, LogOut, Wallet, Clock, ChevronDown, Key, ShieldCheck } from 'lucide-react';
 
 export default function App() {
   const { user, isAuthenticated, logout, updateUser, sessionRemainingSeconds } = useAuthStore();
@@ -87,6 +87,7 @@ export default function App() {
 
 
   const [showResetPinModal, setShowResetPinModal] = useState(false);
+  const [showCreateTpinModal, setShowCreateTpinModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -329,12 +330,7 @@ export default function App() {
     return <CreateMpinModal isOpen={true} user={user} />;
   }
 
-  // 4. Mandatory 4-Digit TPIN Setup Guard (Financial Security for Live Bill Pay & Payout)
-  if (user.role !== 'admin' && !user.tpin_set) {
-    return <CreateTpinModal isOpen={true} user={user} />;
-  }
-
-  // 5. Mandatory KYC Guard (Applies to all non-admin users: Retailer, Distributor, Super Distributor)
+  // 4. Mandatory KYC Guard (Applies to all non-admin users: Retailer, Distributor, Super Distributor)
   if (user.role !== 'admin') {
     const kycStatus = user.kyc_status || 'not_submitted';
 
@@ -431,6 +427,19 @@ export default function App() {
                     <p className="text-[10px] text-slate-400 truncate">{user.email || user.mobile_number}</p>
                   </div>
 
+                  {user.role !== 'admin' && (
+                    <button
+                      onClick={() => {
+                        setShowCreateTpinModal(true);
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 flex items-center gap-2"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>{user.tpin_set ? 'Change 4-Digit TPIN' : 'Create 4-Digit TPIN'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setShowResetPinModal(true);
@@ -521,6 +530,16 @@ export default function App() {
         <ResetPinOtpModal
           isOpen={true}
           onClose={() => setShowResetPinModal(false)}
+        />
+      )}
+
+      {/* Create / Change 4-Digit TPIN Modal (Can be opened from profile menu or anywhere in panel) */}
+      {showCreateTpinModal && (
+        <CreateTpinModal
+          isOpen={true}
+          user={user}
+          onClose={() => setShowCreateTpinModal(false)}
+          onSuccess={() => setShowCreateTpinModal(false)}
         />
       )}
     </div>

@@ -7,8 +7,9 @@ import type { PayoutTransaction } from '../../types/payout';
 import { 
   Wallet, ShieldCheck, User, Store, Phone, CheckCircle2, 
   ArrowUpRight, RefreshCw, Coins, Zap, CreditCard, Receipt, 
-  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, QrCode
+  ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, QrCode, Lock
 } from 'lucide-react';
+import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 export const RetailerDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +18,7 @@ export const RetailerDashboard: React.FC = () => {
   const [liveHistoryList, setLiveHistoryList] = useState<any[]>([]);
   const [payoutTxnsList, setPayoutTxnsList] = useState<PayoutTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   // Date Filter State (Default: TODAY as requested)
   const [dateFilter, setDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL' | 'CUSTOM'>('TODAY');
@@ -157,6 +159,32 @@ export const RetailerDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* TPIN SETUP NOTICE (IF NOT SET) */}
+      {!user?.tpin_set && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-indigo-500/15 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                Setup 4-Digit TPIN for Live Bill Pay & Instant Payout
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">Action Needed</span>
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                You have not created your 4-digit Transaction PIN yet. Create it now anytime so you can instantly pay bills and payout funds.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCreateTpin(true)}
+            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition shrink-0 cursor-pointer"
+          >
+            Create 4-Digit TPIN Now
+          </button>
+        </div>
+      )}
 
       {/* SECTION HEADER & TOP-RIGHT CORNER FILTER CONTROLS */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/80 p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-lg">
@@ -440,6 +468,16 @@ export const RetailerDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Create TPIN Modal from Dashboard */}
+      {showCreateTpin && (
+        <CreateTpinModal
+          isOpen={true}
+          user={user || undefined}
+          onClose={() => setShowCreateTpin(false)}
+          onSuccess={() => setShowCreateTpin(false)}
+        />
+      )}
     </div>
   );
 };

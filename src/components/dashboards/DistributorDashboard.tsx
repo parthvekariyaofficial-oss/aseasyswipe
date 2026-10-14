@@ -4,7 +4,8 @@ import type { UserProfile } from '../../types/auth';
 import type { QrPaymentRequest } from '../../types/qr';
 import { useAuthStore } from '../../store/authStore';
 import { AddUserModal } from '../common/AddUserModal';
-import { Users, Wallet, RefreshCw, Store, UserPlus, QrCode, Coins, ArrowUpRight } from 'lucide-react';
+import { CreateTpinModal } from '../auth/CreateTpinModal';
+import { Users, Wallet, RefreshCw, Store, UserPlus, QrCode, Coins, ArrowUpRight, Lock } from 'lucide-react';
 
 export const DistributorDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -12,6 +13,7 @@ export const DistributorDashboard: React.FC = () => {
   const [qrRequests, setQrRequests] = useState<QrPaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,6 +85,32 @@ export const DistributorDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* TPIN SETUP NOTICE (IF NOT SET) */}
+      {!user?.tpin_set && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-blue-500/10 to-indigo-500/15 border border-amber-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                Setup 4-Digit TPIN for Live Bill Pay & Instant Payout
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">Action Needed</span>
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                You have not created your 4-digit Transaction PIN yet. Create it now anytime so you can instantly pay bills and payout funds.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCreateTpin(true)}
+            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition shrink-0 cursor-pointer"
+          >
+            Create 4-Digit TPIN Now
+          </button>
+        </div>
+      )}
 
       {/* PRIMARY STATS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -233,6 +261,16 @@ export const DistributorDashboard: React.FC = () => {
         onUserAdded={fetchData}
         defaultRole="user"
       />
+
+      {/* Create TPIN Modal from Dashboard */}
+      {showCreateTpin && (
+        <CreateTpinModal
+          isOpen={true}
+          user={user || undefined}
+          onClose={() => setShowCreateTpin(false)}
+          onSuccess={() => setShowCreateTpin(false)}
+        />
+      )}
 
     </div>
   );

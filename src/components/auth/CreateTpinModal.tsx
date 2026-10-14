@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/api';
-import { ShieldCheck, Check, AlertCircle, Eye, EyeOff, Lock } from 'lucide-react';
+import { ShieldCheck, Check, AlertCircle, Eye, EyeOff, Lock, X } from 'lucide-react';
 import type { UserProfile } from '../../types/auth';
 
 interface CreateTpinModalProps {
   isOpen?: boolean;
   user?: UserProfile;
   onSuccess?: () => void;
+  onClose?: () => void;
 }
 
 export const CreateTpinModal: React.FC<CreateTpinModalProps> = ({
   isOpen = true,
   user: propUser,
   onSuccess,
+  onClose,
 }) => {
   const { user: storeUser, updateUser } = useAuthStore();
   const user = propUser || storeUser;
@@ -41,6 +43,7 @@ export const CreateTpinModal: React.FC<CreateTpinModalProps> = ({
       const updatedProfile = { ...(res.user || user), tpin, tpin_set: true };
       updateUser(updatedProfile);
       if (onSuccess) onSuccess();
+      if (onClose) onClose();
     } catch (err: any) {
       console.error('Failed to save TPIN:', err);
       const apiMsg = err.response?.data?.message || err.message || 'Failed to save TPIN on server. Please try again.';
@@ -54,15 +57,29 @@ export const CreateTpinModal: React.FC<CreateTpinModalProps> = ({
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="max-w-md w-full glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/40 shadow-2xl relative overflow-hidden animate-shake">
         
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition z-10"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
         <div className="absolute -top-20 -right-20 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="text-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3 border border-emerald-500/40 shadow-lg">
             <Lock className="w-7 h-7" />
           </div>
-          <h2 className="text-xl font-bold text-white">Financial Security: Create 4-Digit TPIN</h2>
+          <h2 className="text-xl font-bold text-white">
+            {user.tpin_set ? 'Change 4-Digit TPIN' : 'Financial Security: Create 4-Digit TPIN'}
+          </h2>
           <p className="text-xs text-slate-300 mt-1">
-            Create a 4-digit secret Transaction PIN (TPIN). You will need this TPIN every time you perform Live Bill Pay and Instant Payout transfers.
+            {user.tpin_set
+              ? 'Update your secret 4-digit Transaction PIN (TPIN) for Live Bill Pay & Instant Payout.'
+              : 'Set a 4-digit secret Transaction PIN (TPIN). You will need this PIN every time you perform Live Bill Pay and Instant Payout transfers.'}
           </p>
         </div>
 

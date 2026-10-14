@@ -10,6 +10,7 @@ import {
   Calendar, Search, Filter, RotateCcw, X
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 export const UserPayoutTransfer: React.FC = () => {
   const { user, updateUser } = useAuthStore();
@@ -31,6 +32,7 @@ export const UserPayoutTransfer: React.FC = () => {
 
   // Confirmation Modal & Processing State with TPIN verification
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [showCreateTpin, setShowCreateTpin] = useState<boolean>(false);
   const [tpin, setTpin] = useState<string>('');
   const [verifyingTpin, setVerifyingTpin] = useState<boolean>(false);
   const [transferLoading, setTransferLoading] = useState<boolean>(false);
@@ -957,24 +959,45 @@ export const UserPayoutTransfer: React.FC = () => {
               </div>
             </div>
 
-            {/* 4-Digit TPIN Input */}
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-              <label className="block text-xs font-bold text-slate-300">
-                Enter 4-Digit TPIN <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="password"
-                maxLength={4}
-                required
-                placeholder="••••"
-                value={tpin}
-                onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-slate-900 border border-slate-750 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
-              />
-              <p className="text-[10px] text-slate-400 text-center">
-                Enter your 4-digit secret transaction PIN to authorize this transfer
-              </p>
-            </div>
+            {/* 4-Digit TPIN Input / Prompt */}
+            {!user?.tpin_set ? (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-2.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-amber-300">4-Digit TPIN Required</p>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    You have not created your 4-digit Transaction PIN yet. Create it now to authorize payout transfers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTpin(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition"
+                >
+                  Create 4-Digit TPIN Now
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+                <label className="block text-xs font-bold text-slate-300">
+                  Enter 4-Digit TPIN <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  required
+                  placeholder="••••"
+                  value={tpin}
+                  onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-900 border border-slate-750 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
+                />
+                <p className="text-[10px] text-slate-400 text-center">
+                  Enter your 4-digit secret transaction PIN to authorize this transfer
+                </p>
+              </div>
+            )}
 
             {confirmError && (
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
@@ -1000,7 +1023,7 @@ export const UserPayoutTransfer: React.FC = () => {
               <button
                 type="button"
                 onClick={handleExecutePayout}
-                disabled={transferLoading || verifyingTpin || tpin.length !== 4}
+                disabled={!user?.tpin_set || transferLoading || verifyingTpin || tpin.length !== 4}
                 className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
               >
                 {transferLoading || verifyingTpin ? (
@@ -1021,6 +1044,16 @@ export const UserPayoutTransfer: React.FC = () => {
 
           </div>
         </div>
+      )}
+
+      {/* Create TPIN Modal from Payout */}
+      {showCreateTpin && (
+        <CreateTpinModal
+          isOpen={true}
+          user={user || undefined}
+          onClose={() => setShowCreateTpin(false)}
+          onSuccess={() => setShowCreateTpin(false)}
+        />
       )}
 
       {/* RECEIPT MODAL */}
