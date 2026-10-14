@@ -6,7 +6,8 @@ import type { QrMaster, QrPaymentRequest } from '../../types/qr';
 import { 
   QrCode, Copy, Check, Upload, ArrowRight, ShieldCheck, 
   AlertCircle, CheckCircle2, Clock, XCircle, Search, RefreshCw, 
-  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter, Coins, Images 
+  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter, Coins, Images,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink, Move
 } from 'lucide-react';
 
 export const QRPaymentRequests: React.FC = () => {
@@ -43,7 +44,14 @@ export const QRPaymentRequests: React.FC = () => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectingReq, setRejectingReq] = useState<QrPaymentRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [previewRequest, setPreviewRequest] = useState<QrPaymentRequest | null>(null);
   const [previewScreenshot, setPreviewScreenshot] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panPosition, setPanPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [rotation, setRotation] = useState<number>(0);
+  const [copiedModalUtr, setCopiedModalUtr] = useState<boolean>(false);
 
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,7 +92,66 @@ export const QRPaymentRequests: React.FC = () => {
     }
   };
 
+  const handleResetZoom = () => {
+    setZoomLevel(1);
+    setPanPosition({ x: 0, y: 0 });
+    setRotation(0);
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.25, 4));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleRotate = () => {
+    setRotation(prev => (prev + 90) % 360);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    setZoomLevel(prev => {
+      const next = prev + delta;
+      return Math.min(Math.max(0.5, next), 4);
+    });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - panPosition.x, y: e.clientY - panPosition.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setPanPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleCloseModal = () => {
+    setPreviewScreenshot(null);
+    setPreviewRequest(null);
+    handleResetZoom();
+  };
+
+  const handleCopyModalUtr = (utr: string) => {
+    navigator.clipboard.writeText(utr);
+    setCopiedModalUtr(true);
+    setTimeout(() => setCopiedModalUtr(false), 2000);
+  };
+
   const handleOpenScreenshot = async (req: QrPaymentRequest) => {
+    setPreviewRequest(req);
+    handleResetZoom();
     if (req.screenshot_url) {
       setPreviewScreenshot(req.screenshot_url);
       return;
@@ -183,6 +250,9 @@ export const QRPaymentRequests: React.FC = () => {
         setSuccessMessage(res.message);
         setRejectingReq(null);
         setRejectionReason('');
+        if (previewRequest?.id === reqId) {
+          setPreviewRequest(prev => prev ? { ...prev, status: action, rejection_reason: reason } : null);
+        }
         fetchData();
       } else {
         alert(res.message || 'Operation failed.');
@@ -1020,9 +1090,9 @@ export const QRPaymentRequests: React.FC = () => {
 
       </div>
 
-      {/* REJECTION REASON MODAL */}
+      {/* REJECTION REASON MODAL (z-[60] so it appears on top of preview modal) */}
       {rejectingReq && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-extrabold text-white flex items-center gap-2">
               <XCircle className="w-5 h-5 text-rose-400" /> Reject Payment Request
@@ -1064,18 +1134,305 @@ export const QRPaymentRequests: React.FC = () => {
         </div>
       )}
 
-      {/* SCREENSHOT PREVIEW MODAL */}
+      {/* RICH SCREENSHOT PREVIEW & VERIFICATION MODAL */}
       {previewScreenshot && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setPreviewScreenshot(null)}>
-          <div className="relative max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col items-center">
-            <button
-              onClick={() => setPreviewScreenshot(null)}
-              className="absolute top-3 right-3 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h4 className="text-sm font-bold text-white mb-3">Payment Receipt Screenshot</h4>
-            <img src={previewScreenshot} alt="Receipt" className="max-h-[70vh] rounded-2xl object-contain border border-slate-700" />
+        <div 
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCloseModal();
+          }}
+        >
+          <div 
+            className="relative w-full max-w-5xl xl:max-w-6xl h-[92vh] max-h-[850px] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* MODAL HEADER */}
+            <div className="px-5 py-3.5 bg-slate-950/95 border-b border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <Images className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white truncate">
+                      Payment Receipt & Request Verification
+                    </h3>
+                    {previewRequest && (
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        previewRequest.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        previewRequest.status === 'rejected' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                        'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {previewRequest.status}
+                      </span>
+                    )}
+                  </div>
+                  {previewRequest && (
+                    <p className="text-xs text-slate-400 truncate">
+                      UTR: <span className="font-mono text-slate-200 font-bold">{previewRequest.utr_number}</span> • Amount: <span className="font-bold text-white">₹{Number(previewRequest.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* TOP HEADER CONTROLS */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+                  <span className="text-[11px] font-mono text-slate-400 font-bold">{Math.round(zoomLevel * 100)}%</span>
+                </div>
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Close (Esc)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* MODAL BODY (SPLIT 2 COLUMNS ON LG) */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 overflow-hidden">
+              
+              {/* LEFT COLUMN: INTERACTIVE ZOOMABLE & DRAGGABLE IMAGE VIEWER */}
+              <div 
+                className={`${previewRequest ? 'lg:col-span-7' : 'lg:col-span-12'} h-full flex flex-col bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 relative select-none overflow-hidden`}
+              >
+                {/* INTERACTIVE STAGE */}
+                <div 
+                  className="flex-1 w-full h-full relative overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+                  onWheel={handleWheel}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                  onDoubleClick={handleResetZoom}
+                  title="Scroll to Zoom • Click & Drag to Move • Double click to Reset"
+                >
+                  <img
+                    src={previewScreenshot}
+                    alt="Payment Screenshot Receipt"
+                    draggable={false}
+                    className="max-h-[82%] max-w-[85%] object-contain rounded-xl shadow-2xl pointer-events-none select-none border border-slate-800"
+                    style={{
+                      transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomLevel}) rotate(${rotation}deg)`,
+                      transformOrigin: 'center center',
+                      transition: isDragging ? 'none' : 'transform 0.12s ease-out'
+                    }}
+                  />
+
+                  {/* FLOATING HELPER TIP */}
+                  <div className="absolute top-3 left-3 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md border border-slate-800 text-[11px] text-slate-300 pointer-events-none flex items-center gap-1.5 shadow-lg">
+                    <Move className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Scroll to Zoom • Drag to Move • Double-click to Reset</span>
+                  </div>
+
+                  {/* FLOATING CONTROLS BAR (BOTTOM) */}
+                  <div className="absolute bottom-3 inset-x-0 mx-auto w-fit flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800 shadow-2xl z-10">
+                    <button
+                      onClick={handleZoomOut}
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition cursor-pointer"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs font-mono font-bold text-slate-200 px-2 min-w-[50px] text-center">
+                      {Math.round(zoomLevel * 100)}%
+                    </span>
+                    <button
+                      onClick={handleZoomIn}
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition cursor-pointer"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-slate-750 mx-1" />
+                    <button
+                      onClick={handleRotate}
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition cursor-pointer"
+                      title="Rotate 90°"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleResetZoom}
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition cursor-pointer"
+                      title="Reset Zoom & Position"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                    <div className="w-px h-4 bg-slate-750 mx-1" />
+                    <a
+                      href={previewScreenshot}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition"
+                      title="Open Original Image in New Tab"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: REQUEST DETAILS & VERIFICATION ACTIONS */}
+              {previewRequest && (
+                <div className="lg:col-span-5 h-full flex flex-col bg-slate-900 overflow-hidden">
+                  <div className="flex-1 p-5 overflow-y-auto space-y-4">
+
+                    {/* 1. FINANCIAL SUMMARY CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Payment Breakdown</p>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-300">Requested Amount:</span>
+                        <span className="text-xl font-black text-white font-mono">
+                          ₹{Number(previewRequest.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80">
+                        <span className="text-slate-400">QR Charge ({previewRequest.charge_percent || 0.5}%):</span>
+                        <span className="text-rose-400 font-mono font-bold">
+                          -₹{Number(previewRequest.charge_amount || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                        <span className="font-extrabold text-emerald-400">Net Wallet Credit:</span>
+                        <span className="text-lg font-black text-emerald-400 font-mono">
+                          ₹{Number(previewRequest.net_amount || (previewRequest.amount - (previewRequest.charge_amount || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 2. TRANSACTION IDENTIFICATION CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Transaction Info</p>
+                      
+                      {/* UTR NUMBER WITH 1-CLICK COPY */}
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block">Bank UTR / Ref No</span>
+                          <span className="font-mono font-black text-indigo-300 text-sm tracking-wide select-all truncate block">
+                            {previewRequest.utr_number}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleCopyModalUtr(previewRequest.utr_number)}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                        >
+                          {copiedModalUtr ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedModalUtr ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between py-1 border-b border-slate-900">
+                        <span className="text-slate-400">Assigned QR:</span>
+                        <span className="font-bold text-white">{previewRequest.qr_name || 'Primary QR'}</span>
+                      </div>
+                      {previewRequest.upi_id && (
+                        <div className="flex justify-between py-1 border-b border-slate-900">
+                          <span className="text-slate-400">Target UPI ID:</span>
+                          <span className="font-mono text-slate-300">{previewRequest.upi_id}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-400">Request Date & Time:</span>
+                        <span className="font-mono text-slate-300">
+                          {new Date(previewRequest.created_at).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3. RETAILER PROFILE CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">User / Retailer Details</p>
+                      <div className="flex justify-between py-1 border-b border-slate-900">
+                        <span className="text-slate-400">User Name:</span>
+                        <span className="font-bold text-white">{previewRequest.user_name || 'Retailer'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-900">
+                        <span className="text-slate-400">Firm Name:</span>
+                        <span className="font-bold text-slate-200">{previewRequest.firm_name || '-'}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-400">Registered Mobile:</span>
+                        <span className="font-mono text-indigo-300 font-bold">{previewRequest.mobile_number}</span>
+                      </div>
+                    </div>
+
+                    {/* 4. ADMIN COMMISSION (IF ADMIN) */}
+                    {isAdmin && (
+                      <div className="p-3.5 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-xs space-y-1.5">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-400">Platform Commission</p>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Admin Commission:</span>
+                          <span className="font-mono font-bold text-emerald-400">
+                            +₹{Number(
+                              previewRequest.admin_commission !== undefined
+                                ? previewRequest.admin_commission
+                                : Math.max(0, (previewRequest.charge_amount || 0) - ((previewRequest.distributor_commission || 0) + (previewRequest.super_distributor_commission || 0)))
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* REJECTION REASON IF REJECTED */}
+                    {previewRequest.status === 'rejected' && previewRequest.rejection_reason && (
+                      <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs">
+                        <p className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Rejection Reason</p>
+                        <p className="text-rose-200 mt-1">{previewRequest.rejection_reason}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* MODAL BOTTOM ACTION BAR */}
+                  <div className="p-4 bg-slate-950/95 border-t border-slate-800 shrink-0">
+                    {isAdmin && previewRequest.status === 'pending' ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          disabled={processingId === previewRequest.id}
+                          onClick={async () => {
+                            await handleProcessRequest(previewRequest.id, 'approved');
+                            setPreviewRequest(prev => prev ? { ...prev, status: 'approved' } : null);
+                          }}
+                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/50 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>{processingId === previewRequest.id ? 'Approving...' : `Approve (₹${Number(previewRequest.amount).toLocaleString('en-IN')})`}</span>
+                        </button>
+
+                        <button
+                          disabled={processingId === previewRequest.id}
+                          onClick={() => setRejectingReq(previewRequest)}
+                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs shadow-lg shadow-rose-950/50 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                          <span>Reject Request</span>
+                        </button>
+                      </div>
+                    ) : previewRequest.status === 'approved' ? (
+                      <div className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-xs">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Approved & Credited: ₹{Number(previewRequest.net_amount || (previewRequest.amount - (previewRequest.charge_amount || 0))).toFixed(2)} to wallet.</span>
+                      </div>
+                    ) : previewRequest.status === 'rejected' ? (
+                      <div className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-xs">
+                        <XCircle className="w-4 h-4" />
+                        <span>This payment request was Rejected.</span>
+                      </div>
+                    ) : (
+                      <div className="text-center text-xs text-slate-400">
+                        Status: <strong className="text-amber-400 uppercase">{previewRequest.status}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
+            </div>
           </div>
         </div>
       )}
