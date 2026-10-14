@@ -394,18 +394,6 @@ export const UserPayoutTransfer: React.FC = () => {
               Transfer funds from your wallet directly to any Indian bank account via IMPS or NEFT.
             </p>
           </div>
-
-          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-              <Wallet className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Payout Wallet Balance</p>
-              <p className="text-2xl font-black text-white">
-                ₹{currentBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* TAB BUTTONS */}

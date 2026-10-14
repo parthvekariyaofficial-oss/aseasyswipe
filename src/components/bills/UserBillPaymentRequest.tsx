@@ -306,17 +306,6 @@ export const UserBillPaymentRequest: React.FC = () => {
             </p>
           </div>
         </div>
-
-        {/* Live Wallet Pill */}
-        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 self-end sm:self-auto">
-          <Wallet className="w-5 h-5 text-emerald-400" />
-          <div className="text-right">
-            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Main Wallet</p>
-            <p className="text-sm font-black text-emerald-400">
-              ₹{Number(user?.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Notifications */}
