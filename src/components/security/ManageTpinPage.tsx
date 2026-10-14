@@ -91,7 +91,7 @@ export const ManageTpinPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 w-full max-w-5xl mx-auto pb-12 animate-in fade-in duration-300">
+    <div className="space-y-6 w-full pb-16 animate-in fade-in duration-300">
       
       {/* HEADER BANNER */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950/50 to-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl relative overflow-hidden">
@@ -117,7 +117,7 @@ export const ManageTpinPage: React.FC = () => {
               <Key className="w-7 h-7 text-emerald-400" />
               4-Digit Financial TPIN Security
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+            <p className="text-xs sm:text-sm text-slate-300">
               Manage your 4-digit secret Transaction PIN used to authorize <strong>Live Bill Pay</strong> and <strong>Instant Payout</strong> transactions.
             </p>
           </div>
