@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
-import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 const defaultCategoriesList: BillerCategory[] = [
   { category_id: 7, category_name: "Credit Card" }
@@ -19,7 +18,6 @@ const defaultCategoriesList: BillerCategory[] = [
 export const LiveBillPayment: React.FC = () => {
   const { user } = useAuthStore();
   const { liveBillPayEnabled } = useSettingsStore();
-  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   // Category & Biller State (Credit Card Only - Fetched from Database)
   const [categories] = useState<BillerCategory[]>(defaultCategoriesList);
@@ -1123,16 +1121,6 @@ export const LiveBillPayment: React.FC = () => {
 
           </div>
         </div>
-      )}
-
-      {/* Create TPIN Modal from Bill Pay */}
-      {showCreateTpin && (
-        <CreateTpinModal
-          isOpen={true}
-          user={user || undefined}
-          onClose={() => setShowCreateTpin(false)}
-          onSuccess={() => setShowCreateTpin(false)}
-        />
       )}
 
     </div>

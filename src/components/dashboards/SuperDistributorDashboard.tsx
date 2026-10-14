@@ -4,7 +4,6 @@ import type { UserProfile } from '../../types/auth';
 import type { QrPaymentRequest } from '../../types/qr';
 import { useAuthStore } from '../../store/authStore';
 import { AddUserModal } from '../common/AddUserModal';
-import { CreateTpinModal } from '../auth/CreateTpinModal';
 import { Award, Users, Wallet, ShieldCheck, UserPlus, RefreshCw, QrCode, Coins, ArrowUpRight, Lock } from 'lucide-react';
 
 export const SuperDistributorDashboard: React.FC = () => {
@@ -13,7 +12,6 @@ export const SuperDistributorDashboard: React.FC = () => {
   const [qrRequests, setQrRequests] = useState<QrPaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   const fetchTeam = async () => {
     setLoading(true);
@@ -257,16 +255,6 @@ export const SuperDistributorDashboard: React.FC = () => {
         distributors={distributors}
         defaultRole="distributor"
       />
-
-      {/* Create TPIN Modal from Dashboard */}
-      {showCreateTpin && (
-        <CreateTpinModal
-          isOpen={true}
-          user={user || undefined}
-          onClose={() => setShowCreateTpin(false)}
-          onSuccess={() => setShowCreateTpin(false)}
-        />
-      )}
 
     </div>
   );

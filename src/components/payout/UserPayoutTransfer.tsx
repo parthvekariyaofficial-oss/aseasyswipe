@@ -10,7 +10,6 @@ import {
   Calendar, Search, Filter, RotateCcw, X
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
-import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 export const UserPayoutTransfer: React.FC = () => {
   const { user, updateUser } = useAuthStore();
@@ -32,7 +31,6 @@ export const UserPayoutTransfer: React.FC = () => {
 
   // Confirmation Modal & Processing State with TPIN verification
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
-  const [showCreateTpin, setShowCreateTpin] = useState<boolean>(false);
   const [tpin, setTpin] = useState<string>('');
   const [verifyingTpin, setVerifyingTpin] = useState<boolean>(false);
   const [transferLoading, setTransferLoading] = useState<boolean>(false);
@@ -1048,16 +1046,6 @@ export const UserPayoutTransfer: React.FC = () => {
 
           </div>
         </div>
-      )}
-
-      {/* Create TPIN Modal from Payout */}
-      {showCreateTpin && (
-        <CreateTpinModal
-          isOpen={true}
-          user={user || undefined}
-          onClose={() => setShowCreateTpin(false)}
-          onSuccess={() => setShowCreateTpin(false)}
-        />
       )}
 
       {/* RECEIPT MODAL */}

@@ -9,7 +9,6 @@ import {
   ArrowUpRight, RefreshCw, Coins, Zap, CreditCard, Receipt, 
   ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, QrCode, Lock
 } from 'lucide-react';
-import { CreateTpinModal } from '../auth/CreateTpinModal';
 
 export const RetailerDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -18,7 +17,6 @@ export const RetailerDashboard: React.FC = () => {
   const [liveHistoryList, setLiveHistoryList] = useState<any[]>([]);
   const [payoutTxnsList, setPayoutTxnsList] = useState<PayoutTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateTpin, setShowCreateTpin] = useState(false);
 
   // Date Filter State (Default: TODAY as requested)
   const [dateFilter, setDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL' | 'CUSTOM'>('TODAY');
@@ -471,16 +469,6 @@ export const RetailerDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Create TPIN Modal from Dashboard */}
-      {showCreateTpin && (
-        <CreateTpinModal
-          isOpen={true}
-          user={user || undefined}
-          onClose={() => setShowCreateTpin(false)}
-          onSuccess={() => setShowCreateTpin(false)}
-        />
-      )}
     </div>
   );
 };

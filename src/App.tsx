@@ -7,7 +7,6 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { LoginSplitScreen } from './components/auth/LoginSplitScreen';
 import { ForceChangePasswordModal } from './components/auth/ForceChangePasswordModal';
 import { CreateMpinModal } from './components/auth/CreateMpinModal';
-import { CreateTpinModal } from './components/auth/CreateTpinModal';
 import { ResetPinOtpModal } from './components/auth/ResetPinOtpModal';
 import { AdminDashboard } from './components/dashboards/AdminDashboard';
 import { AdminOverviewDashboard } from './components/dashboards/AdminOverviewDashboard';
@@ -92,7 +91,6 @@ export default function App() {
 
 
   const [showResetPinModal, setShowResetPinModal] = useState(false);
-  const [showCreateTpinModal, setShowCreateTpinModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>(() => {
     return typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -447,16 +445,6 @@ export default function App() {
                     </button>
                   )}
 
-                  <button
-                    onClick={() => {
-                      setShowResetPinModal(true);
-                      setShowProfileMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-                  >
-                    <Key className="w-4 h-4 text-indigo-400" /> Reset 4-Digit TPIN
-                  </button>
-
                   <div className="border-t border-slate-800 my-1" />
 
                   <button
@@ -536,24 +524,6 @@ export default function App() {
           {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'manage_tpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
-
-      {/* Reset TPIN / MPIN Modal */}
-      {showResetPinModal && (
-        <ResetPinOtpModal
-          isOpen={true}
-          onClose={() => setShowResetPinModal(false)}
-        />
-      )}
-
-      {/* Create / Change 4-Digit TPIN Modal (Can be opened from profile menu or anywhere in panel) */}
-      {showCreateTpinModal && (
-        <CreateTpinModal
-          isOpen={true}
-          user={user}
-          onClose={() => setShowCreateTpinModal(false)}
-          onSuccess={() => setShowCreateTpinModal(false)}
-        />
-      )}
     </div>
   );
 }
