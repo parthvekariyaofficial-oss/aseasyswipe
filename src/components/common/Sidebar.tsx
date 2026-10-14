@@ -127,38 +127,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
         id: 'users',
         label: 'Dashboard & Account',
         icon: Users
+      },
+      {
+        id: 'qr_requests',
+        label: 'QR Payment History',
+        icon: QrCode
       }
     ];
 
-    if (user?.role === 'user' || user?.role === 'distributor' || user?.role === 'super_distributor') {
+    if (instantPayoutEnabled) {
       items.push({
-        id: 'user_statement',
-        label: 'Account Passbook',
-        icon: FileText
-      });
-      if (instantPayoutEnabled) {
-        items.push({
-          id: 'payout_transfer',
-          label: 'Instant Payout',
-          icon: ArrowRightLeft
-        });
-      }
-      items.push({
-        id: 'manage_tpin',
-        label: '4-Digit TPIN',
-        icon: Key
-      });
-      items.push({
-        id: 'change_mpin',
-        label: 'Change 6-Digit MPIN',
-        icon: KeyRound
-      });
-      items.push({
-        id: 'change_password',
-        label: 'Change Password',
-        icon: Lock
+        id: 'payout_transfer',
+        label: 'Instant Payout',
+        icon: ArrowRightLeft
       });
     }
+
+    items.push({
+      id: 'user_statement',
+      label: 'Account Passbook',
+      icon: FileText
+    });
+
+    items.push({
+      id: 'manage_tpin',
+      label: 'Create TPIN',
+      icon: Key
+    });
+
+    items.push({
+      id: 'change_mpin',
+      label: 'Change MPIN',
+      icon: KeyRound
+    });
+
+    items.push({
+      id: 'change_password',
+      label: 'Change Password',
+      icon: Lock
+    });
 
     if (user?.role === 'user') {
       if (liveBillPayEnabled) {
@@ -172,19 +179,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         id: 'bill_request',
         label: 'Credit Card Bill Pay',
         icon: CreditCard
-      });
-      items.push({
-        id: 'qr_requests',
-        label: 'QR Add Money',
-        icon: QrCode
-      });
-    }
-
-    if (user?.role === 'distributor' || user?.role === 'super_distributor') {
-      items.push({
-        id: 'qr_requests',
-        label: 'QR Payment History',
-        icon: QrCode
       });
     }
 

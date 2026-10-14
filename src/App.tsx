@@ -272,9 +272,9 @@ export default function App() {
       case 'bill_request':
         return 'Credit Card Bill Payment';
       case 'manage_tpin':
-        return '4-Digit Financial TPIN';
+        return 'Create TPIN';
       case 'change_mpin':
-        return '6-Digit Login MPIN';
+        return 'Change MPIN';
       case 'change_password':
         return 'Account Password Security';
       default:
@@ -460,7 +460,7 @@ export default function App() {
                       className="w-full text-left px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 flex items-center gap-2 cursor-pointer"
                     >
                       <Key className="w-4 h-4 text-emerald-400" />
-                      <span>{user.tpin_set ? 'Manage 4-Digit TPIN' : 'Create 4-Digit TPIN'}</span>
+                      <span>{user.tpin_set ? 'Manage TPIN' : 'Create TPIN'}</span>
                     </button>
                   )}
 
