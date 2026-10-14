@@ -29,6 +29,7 @@ import { LandingPage } from './components/home/LandingPage';
 import { KycUploadScreen } from './components/kyc/KycUploadScreen';
 import { KycUnderReviewScreen } from './components/kyc/KycUnderReviewScreen';
 import { AdminKycManagement } from './components/kyc/AdminKycManagement';
+import { ManageTpinPage } from './components/security/ManageTpinPage';
 import type { UserRole } from './types/auth';
 import { Menu, LogOut, Wallet, Clock, ChevronDown, Key, ShieldCheck } from 'lucide-react';
 
@@ -61,6 +62,9 @@ export default function App() {
     if (p.includes('admin-kyc') || p.includes('admin_kyc') || p.includes('kyc')) {
       return role === 'admin' ? 'admin_kyc' : 'users';
     }
+    if (p.includes('manage-tpin') || p.includes('tpin')) {
+      return role === 'admin' ? 'dashboard' : 'manage_tpin';
+    }
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
     if (p.includes('qr-requests') || p.includes('qr_requests')) return 'qr_requests';
     if (p.includes('users')) return 'users';
@@ -70,6 +74,7 @@ export default function App() {
 
   const getPathFromTab = (tab: string): string => {
     if (tab === 'dashboard') return '/dashboard';
+    if (tab === 'manage_tpin') return '/manage-tpin';
     if (tab === 'admin_kyc') return '/admin-kyc';
     if (tab === 'admin_payout') return '/admin-payout';
     if (tab === 'payout_transfer') return '/payout';
@@ -253,6 +258,8 @@ export default function App() {
         return 'Live Bill Pay';
       case 'bill_request':
         return 'Credit Card Bill Payment';
+      case 'manage_tpin':
+        return '4-Digit Financial TPIN';
       default:
         return 'Dashboard';
     }
@@ -430,13 +437,13 @@ export default function App() {
                   {user.role !== 'admin' && (
                     <button
                       onClick={() => {
-                        setShowCreateTpinModal(true);
+                        handleTabChange('manage_tpin');
                         setShowProfileMenu(false);
                       }}
-                      className="w-full text-left px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 flex items-center gap-2"
+                      className="w-full text-left px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 flex items-center gap-2 cursor-pointer"
                     >
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>{user.tpin_set ? 'Change 4-Digit TPIN' : 'Create 4-Digit TPIN'}</span>
+                      <Key className="w-4 h-4 text-emerald-400" />
+                      <span>{user.tpin_set ? 'Manage 4-Digit TPIN' : 'Create 4-Digit TPIN'}</span>
                     </button>
                   )}
 
@@ -518,10 +525,15 @@ export default function App() {
               <AdminKycManagement />
             </ProtectedRoute>
           )}
+          {activeTab === 'manage_tpin' && (
+            <ProtectedRoute allowedRoles={['user', 'distributor', 'super_distributor']}>
+              <ManageTpinPage />
+            </ProtectedRoute>
+          )}
           {activeTab === 'qr_master' && <QRMasterManagement />}
           {activeTab === 'qr_requests' && <QRPaymentRequests />}
           {activeTab === 'users' && renderDashboardByRole(user.role)}
-          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'users' && renderDashboardByRole(user.role)}
+          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'manage_tpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
 

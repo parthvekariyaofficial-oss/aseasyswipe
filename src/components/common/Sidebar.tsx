@@ -133,6 +133,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: ArrowRightLeft
         });
       }
+      items.push({
+        id: 'manage_tpin',
+        label: '4-Digit TPIN',
+        icon: Key
+      });
     }
 
     if (user?.role === 'user') {

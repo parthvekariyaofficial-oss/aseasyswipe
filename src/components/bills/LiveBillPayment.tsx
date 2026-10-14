@@ -1071,10 +1071,14 @@ export const LiveBillPayment: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowCreateTpin(true)}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition"
+                      onClick={() => {
+                        setShowPayModal(false);
+                        window.history.pushState(null, '', '/manage-tpin');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition cursor-pointer"
                     >
-                      Create 4-Digit TPIN Now
+                      Go to TPIN Page to Create TPIN
                     </button>
                   </div>
                 ) : (

@@ -101,7 +101,10 @@ export const SuperDistributorDashboard: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={() => setShowCreateTpin(true)}
+            onClick={() => {
+              window.history.pushState(null, '', '/manage-tpin');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }}
             className="px-4 py-2 bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition shrink-0 cursor-pointer"
           >
             Create 4-Digit TPIN Now
