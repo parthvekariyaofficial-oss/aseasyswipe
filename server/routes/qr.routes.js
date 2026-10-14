@@ -773,6 +773,223 @@ router.get('/request/:id/screenshot', verifyToken, async (req, res) => {
   }
 });
 
+// Helper: Format ISO date string into IST (Asia/Kolkata) "YYYY-MM-DD"
+const toIstDateString = (dateVal) => {
+  if (!dateVal) return new Date().toISOString().substring(0, 10);
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal).substring(0, 10);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  } catch {
+    return String(dateVal).substring(0, 10);
+  }
+};
+
+// -----------------------------------------------------------------------------
+// GET /api/qr/gallery/summary (Admin Approved Screenshot Gallery Summary - Date & QR Wise)
+// -----------------------------------------------------------------------------
+router.get('/gallery/summary', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    if (supabase) {
+      try {
+        if (!db.qr_masters || db.qr_masters.length === 0) {
+          const { data: qData } = await supabase.from('qr_masters').select('*');
+          if (qData) db.qr_masters = qData;
+        }
+        if (!db.users || db.users.length === 0) {
+          const { data: uData } = await supabase.from('users_profiles').select('*');
+          if (uData) db.users = uData;
+        }
+
+        const { data: approvedData, error } = await supabase
+          .from('qr_payment_requests')
+          .select('id, user_id, qr_master_id, amount, utr_number, mobile_number, status, processed_at, created_at, screenshot_url')
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(approvedData)) {
+          approvedData.forEach(item => {
+            const idx = (db.qr_payment_requests || []).findIndex(r => r.id === item.id);
+            if (idx >= 0) {
+              db.qr_payment_requests[idx] = { ...db.qr_payment_requests[idx], ...item };
+            } else {
+              db.qr_payment_requests.push(item);
+            }
+          });
+        }
+      } catch (sbErr) {
+        console.error('Supabase QR gallery sync error:', sbErr);
+      }
+    }
+
+    // Filter only approved requests
+    const approvedRequests = (db.qr_payment_requests || []).filter(r => r.status === 'approved');
+
+    // Group by IST Date & QR
+    const dateMap = new Map();
+
+    for (const reqItem of approvedRequests) {
+      const istDate = toIstDateString(reqItem.processed_at || reqItem.created_at);
+      if (!dateMap.has(istDate)) {
+        dateMap.set(istDate, {
+          date: istDate,
+          total_approved_amount: 0,
+          total_approved_count: 0,
+          total_screenshots: 0,
+          qr_map: new Map()
+        });
+      }
+
+      const dayObj = dateMap.get(istDate);
+      const amt = Number(reqItem.amount || 0);
+      dayObj.total_approved_amount += amt;
+      dayObj.total_approved_count += 1;
+
+      const hasScreenshot = Boolean(reqItem.screenshot_url && String(reqItem.screenshot_url).trim().length > 0);
+      if (hasScreenshot) {
+        dayObj.total_screenshots += 1;
+      }
+
+      const qrKey = reqItem.qr_master_id || 'system_qr';
+      if (!dayObj.qr_map.has(qrKey)) {
+        const qm = (db.qr_masters || []).find(q => q.id === reqItem.qr_master_id);
+        dayObj.qr_map.set(qrKey, {
+          qr_master_id: reqItem.qr_master_id || null,
+          qr_name: qm ? qm.name : (reqItem.qr_name || 'Active QR'),
+          upi_id: qm ? qm.upi_id : (reqItem.upi_id || ''),
+          total_amount: 0,
+          total_count: 0,
+          screenshot_count: 0,
+          batches_count: 0
+        });
+      }
+
+      const qrObj = dayObj.qr_map.get(qrKey);
+      qrObj.total_amount += amt;
+      qrObj.total_count += 1;
+      if (hasScreenshot) {
+        qrObj.screenshot_count += 1;
+      }
+    }
+
+    // Convert map to sorted array (newest date first)
+    const datesSummary = Array.from(dateMap.values())
+      .map(d => {
+        const qrList = Array.from(d.qr_map.values()).map(q => ({
+          ...q,
+          batches_count: Math.ceil(q.screenshot_count / 10)
+        }));
+        qrList.sort((a, b) => b.total_amount - a.total_amount);
+
+        return {
+          date: d.date,
+          total_approved_amount: d.total_approved_amount,
+          total_approved_count: d.total_approved_count,
+          total_screenshots: d.total_screenshots,
+          total_batches: Math.ceil(d.total_screenshots / 10),
+          qr_breakdown: qrList
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    return res.status(200).json({
+      success: true,
+      count: datesSummary.length,
+      dates_summary: datesSummary
+    });
+  } catch (error) {
+    console.error('Fetch Gallery Summary Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch proof gallery summary.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/qr/gallery/images (Fetch 10-image batch of approved screenshots)
+// -----------------------------------------------------------------------------
+router.get('/gallery/images', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    const { date, qr_master_id, batch } = req.query;
+    const batchNum = Math.max(1, parseInt(batch, 10) || 1);
+    const limit = 10;
+    const offset = (batchNum - 1) * limit;
+
+    let matching = (db.qr_payment_requests || []).filter(r => {
+      if (r.status !== 'approved') return false;
+      const istDate = toIstDateString(r.processed_at || r.created_at);
+      if (date && date !== 'ALL' && istDate !== date) return false;
+      if (qr_master_id && qr_master_id !== 'all') {
+        if (r.qr_master_id !== qr_master_id && (!r.qr_master_id && qr_master_id !== 'system_qr')) {
+          return false;
+        }
+      }
+      return Boolean(r.screenshot_url && String(r.screenshot_url).trim().length > 0);
+    });
+
+    if (supabase && matching.length === 0 && date && date !== 'ALL') {
+      try {
+        let query = supabase
+          .from('qr_payment_requests')
+          .select('*')
+          .eq('status', 'approved')
+          .not('screenshot_url', 'is', null)
+          .neq('screenshot_url', '')
+          .order('created_at', { ascending: false });
+
+        if (qr_master_id && qr_master_id !== 'all' && qr_master_id !== 'system_qr') {
+          query = query.eq('qr_master_id', qr_master_id);
+        }
+        const { data: sbData } = await query;
+        if (sbData && Array.isArray(sbData)) {
+          matching = sbData.filter(r => toIstDateString(r.processed_at || r.created_at) === date);
+        }
+      } catch (sbErr) {
+        console.error('Supabase query error in gallery images:', sbErr);
+      }
+    }
+
+    // Sort newest first
+    matching.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const totalImages = matching.length;
+    const totalBatches = Math.ceil(totalImages / limit);
+    const paginated = matching.slice(offset, offset + limit);
+
+    const populated = paginated.map(r => {
+      const u = (db.users || []).find(user => user.id === r.user_id);
+      const q = (db.qr_masters || []).find(qm => qm.id === r.qr_master_id);
+      return {
+        id: r.id,
+        amount: Number(r.amount || 0),
+        utr_number: r.utr_number,
+        mobile_number: r.mobile_number || (u ? u.mobile_number : ''),
+        user_name: u ? u.name : (r.user_name || 'Retailer User'),
+        firm_name: u ? u.firm_name : (r.firm_name || 'N/A'),
+        qr_master_id: r.qr_master_id,
+        qr_name: q ? q.name : (r.qr_name || 'Active QR'),
+        upi_id: q ? q.upi_id : (r.upi_id || ''),
+        status: r.status,
+        created_at: r.created_at,
+        processed_at: r.processed_at,
+        screenshot_url: r.screenshot_url
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      date: date || 'ALL',
+      qr_master_id: qr_master_id || 'all',
+      batch: batchNum,
+      limit,
+      total_images: totalImages,
+      total_batches: totalBatches,
+      images: populated
+    });
+  } catch (error) {
+    console.error('Fetch Gallery Images Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch proof gallery images.' });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // POST /api/qr/request/:id/process (ATOMIC & IDEMPOTENT APPROVAL / REJECTION)
 // Prevents Double Approval & Double Credit

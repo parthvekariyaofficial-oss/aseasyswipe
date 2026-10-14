@@ -177,6 +177,16 @@ export const qrApi = {
     const response = await apiClient.post(`/qr/request/${id}/process`, { action, rejection_reason });
     return response.data;
   },
+
+  getGallerySummary: async () => {
+    const response = await apiClient.get('/qr/gallery/summary');
+    return response.data;
+  },
+
+  getGalleryImages: async (params?: { date?: string; qr_master_id?: string; batch?: number }) => {
+    const response = await apiClient.get('/qr/gallery/images', { params });
+    return response.data;
+  },
 };
 
 export const bankApi = {

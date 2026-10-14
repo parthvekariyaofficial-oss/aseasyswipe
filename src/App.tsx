@@ -15,6 +15,7 @@ import { DistributorDashboard } from './components/dashboards/DistributorDashboa
 import { RetailerDashboard } from './components/dashboards/RetailerDashboard';
 import { QRMasterManagement } from './components/qr/QRMasterManagement';
 import { QRPaymentRequests } from './components/qr/QRPaymentRequests';
+import { QRProofGallery } from './components/qr/QRProofGallery';
 import { BankManagement } from './components/bank/BankManagement';
 import { UserBillPaymentRequest } from './components/bills/UserBillPaymentRequest';
 import { AdminBillRequestsManagement } from './components/bills/AdminBillRequestsManagement';
@@ -65,6 +66,7 @@ export default function App() {
       return role === 'admin' ? 'dashboard' : 'manage_tpin';
     }
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
+    if (p.includes('qr-gallery') || p.includes('qr_gallery')) return role === 'admin' ? 'qr_gallery' : 'dashboard';
     if (p.includes('qr-requests') || p.includes('qr_requests')) return 'qr_requests';
     if (p.includes('users')) return 'users';
     if (role === 'admin') return 'dashboard';
@@ -86,6 +88,7 @@ export default function App() {
     if (tab === 'bill_request') return '/bill-request';
     if (tab === 'qr_master') return '/qr-master';
     if (tab === 'qr_requests') return '/qr-requests';
+    if (tab === 'qr_gallery') return '/qr-gallery';
     return '/users';
   };
 
@@ -236,6 +239,8 @@ export default function App() {
         return 'KYC Verification Requests';
       case 'qr_requests':
         return 'QR Payment Requests';
+      case 'qr_gallery':
+        return 'Approved QR Proof Gallery';
       case 'admin_bill_requests':
         return 'CC Bill Requests';
       case 'live_bill_history':
@@ -520,8 +525,13 @@ export default function App() {
           )}
           {activeTab === 'qr_master' && <QRMasterManagement />}
           {activeTab === 'qr_requests' && <QRPaymentRequests />}
+          {activeTab === 'qr_gallery' && (
+            <ProtectedRoute allowedRoles={['admin']}>
+              <QRProofGallery />
+            </ProtectedRoute>
+          )}
           {activeTab === 'users' && renderDashboardByRole(user.role)}
-          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'manage_tpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
+          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'qr_gallery' && activeTab !== 'manage_tpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
     </div>

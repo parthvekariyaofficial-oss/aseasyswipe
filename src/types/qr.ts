@@ -49,3 +49,39 @@ export interface QrSettings {
   qr_instruction_text: string;
   logo_url?: string;
 }
+
+export interface QrProofGalleryItem {
+  id: string;
+  amount: number;
+  utr_number: string;
+  mobile_number: string;
+  user_name: string;
+  firm_name: string;
+  qr_master_id?: string;
+  qr_name: string;
+  upi_id?: string;
+  status: string;
+  created_at: string;
+  processed_at?: string;
+  screenshot_url: string;
+}
+
+export interface QrGroupSummary {
+  qr_master_id: string | null;
+  qr_name: string;
+  upi_id: string;
+  total_amount: number;
+  total_count: number;
+  screenshot_count: number;
+  batches_count: number;
+}
+
+export interface QrDateSummary {
+  date: string;
+  total_approved_amount: number;
+  total_approved_count: number;
+  total_screenshots: number;
+  total_batches: number;
+  qr_breakdown: QrGroupSummary[];
+}
+

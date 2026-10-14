@@ -6,7 +6,7 @@ import type { QrMaster, QrPaymentRequest } from '../../types/qr';
 import { 
   QrCode, Copy, Check, Upload, ArrowRight, ShieldCheck, 
   AlertCircle, CheckCircle2, Clock, XCircle, Search, RefreshCw, 
-  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter, Coins 
+  CheckCircle, X, Eye, FileText, Lock, Calendar, Hash, RotateCcw, Filter, Coins, Images 
 } from 'lucide-react';
 
 export const QRPaymentRequests: React.FC = () => {
@@ -565,41 +565,75 @@ export const QRPaymentRequests: React.FC = () => {
         </div>
       )}
 
-      {/* ADMIN STATS CARDS */}
+      {/* ADMIN STATS CARDS & GALLERY SHORTCUT */}
       {isAdmin && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Pending Approvals</p>
-              <p className="text-xl font-bold text-amber-400 mt-1">{pendingCount}</p>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Pending Approvals</p>
+                <p className="text-xl font-bold text-amber-400 mt-1">{pendingCount}</p>
+              </div>
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
+                <Clock className="w-6 h-6" />
+              </div>
             </div>
-            <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl">
-              <Clock className="w-6 h-6" />
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Approved Payments</p>
+                <p className="text-xl font-bold text-emerald-400 mt-1">{approvedCount}</p>
+              </div>
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Total Net Credited</p>
+                <p className="text-xl font-bold text-purple-300 mt-1">
+                  ₹{totalApprovedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Approved Payments</p>
-              <p className="text-xl font-bold text-emerald-400 mt-1">{approvedCount}</p>
+          {/* QR PROOF GALLERY BANNER FOR ADMIN */}
+          <div className="bg-gradient-to-r from-slate-900 via-purple-950/40 to-slate-900 border border-purple-500/30 p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-purple-600/20 border border-purple-500/40 text-purple-300 shadow-md">
+                <Images className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                  Approved QR Proof Gallery
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase">
+                    10 Images per Folder
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Inspect date-wise approved payment receipt screenshots categorized by QR codes.
+                </p>
+              </div>
             </div>
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-          </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400">Total Net Credited</p>
-              <p className="text-xl font-bold text-purple-300 mt-1">
-                ₹{totalApprovedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div className="p-3 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                window.history.pushState({ tab: 'qr_gallery' }, '', '/qr-gallery');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 transition flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <span>Open Proof Gallery</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
-        </div>
+        </>
       )}
 
       {/* CHANNEL PARTNER (DISTRIBUTOR / SUPER DISTRIBUTOR) STATS CARDS */}
