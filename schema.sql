@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.users_profiles (
     wallet_balance NUMERIC(15,2) DEFAULT 0.00 CHECK (wallet_balance >= 0),
     commission_balance NUMERIC(15,2) DEFAULT 0.00,
     tpin VARCHAR(4) NOT NULL DEFAULT '1234',
+    tpin_set BOOLEAN DEFAULT false,
     mpin VARCHAR(6) DEFAULT '123456',
     mpin_set BOOLEAN DEFAULT false,
     qr_charge_percent NUMERIC(5,2) DEFAULT 0.50, -- % Charge cut per QR payment
@@ -30,6 +31,8 @@ CREATE TABLE IF NOT EXISTS public.users_profiles (
 );
 
 -- Ensure columns exist if table was already created in earlier versions
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS tpin VARCHAR(4) DEFAULT '1234';
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS tpin_set BOOLEAN DEFAULT false;
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin_set BOOLEAN DEFAULT false;
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS kyc_status TEXT CHECK (kyc_status IN ('not_submitted', 'under_review', 'verified', 'rejected')) DEFAULT 'not_submitted';

@@ -399,6 +399,68 @@ router.post('/create-mpin', verifyToken, async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// POST /api/auth/create-tpin
+// Sets user's 4-digit TPIN and marks tpin_set = true
+// -----------------------------------------------------------------------------
+router.post('/create-tpin', verifyToken, async (req, res) => {
+  try {
+    const { tpin } = req.body;
+
+    if (!tpin || String(tpin).length !== 4 || !/^\d{4}$/.test(String(tpin))) {
+      return res.status(400).json({
+        success: false,
+        message: 'TPIN must be exactly 4 numeric digits.'
+      });
+    }
+
+    const cleanTpin = String(tpin).trim();
+    const nowIso = new Date().toISOString();
+
+    let user = db.users.find(u => u.id === req.user.id);
+    if (!user) user = req.user;
+
+    user.tpin = cleanTpin;
+    user.tpin_set = true;
+    user.tpin_attempts = 0;
+    user.tpin_locked_until = null;
+    user.updated_at = nowIso;
+
+    // Update in-memory db.users
+    const memoryIdx = db.users.findIndex(u => u.id === req.user.id);
+    if (memoryIdx !== -1) {
+      db.users[memoryIdx].tpin = cleanTpin;
+      db.users[memoryIdx].tpin_set = true;
+      db.users[memoryIdx].tpin_attempts = 0;
+      db.users[memoryIdx].tpin_locked_until = null;
+      db.users[memoryIdx].updated_at = nowIso;
+    }
+
+    // Update Supabase PostgreSQL database
+    if (supabase) {
+      try {
+        const { error: sbErr } = await supabase.from('users_profiles').update({
+          tpin: cleanTpin,
+          tpin_set: true,
+          updated_at: nowIso
+        }).eq('id', req.user.id);
+        if (sbErr) console.error('Supabase Set TPIN Error:', sbErr);
+      } catch (sbErr) {
+        console.error('Supabase Catch Set TPIN Error:', sbErr);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: '4-digit TPIN successfully created!',
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    console.error('Create TPIN Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error while saving TPIN.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
 // POST /api/auth/request-otp
 // Sends 6-digit WhatsApp/SMS OTP for resetting TPIN or MPIN
 // -----------------------------------------------------------------------------

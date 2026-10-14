@@ -22,6 +22,7 @@ export interface UserProfile {
   commission_balance: number;
   t_plus_one_balance: number;
   tpin?: string;
+  tpin_set?: boolean;
   tpin_attempts?: number;
   tpin_locked_until?: string | null;
   mpin?: string;

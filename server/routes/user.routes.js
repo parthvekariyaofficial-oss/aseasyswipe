@@ -289,6 +289,7 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       wallet_balance: 0.00,
       commission_balance: 0.00,
       tpin: '1234',
+      tpin_set: false,
       mpin: '123456',
       mpin_set: false,
       qr_charge_percent: userChargePct,
@@ -307,6 +308,7 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
         const payload = { ...newUser };
         if (newUser.role === 'admin') {
           delete payload.tpin;
+          delete payload.tpin_set;
           delete payload.wallet_balance;
           delete payload.commission_balance;
           delete payload.qr_charge_percent;

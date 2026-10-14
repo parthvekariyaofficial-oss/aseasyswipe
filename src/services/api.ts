@@ -54,6 +54,11 @@ export const authApi = {
     return response.data;
   },
 
+  createTpin: async (tpin: string): Promise<AuthResponse> => {
+    const response = await apiClient.post('/auth/create-tpin', { tpin });
+    return response.data;
+  },
+
   requestOtp: async (data: { purpose: string; channel: 'WHATSAPP' | 'SMS' }): Promise<{ success: boolean; message: string; demoOtpCode?: string }> => {
     const response = await apiClient.post('/auth/request-otp', data);
     return response.data;

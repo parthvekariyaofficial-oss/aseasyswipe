@@ -50,8 +50,8 @@ export const LiveBillPayment: React.FC = () => {
   const [payAmount, setPayAmount] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<string>('Cash');
   const [customerPan, setCustomerPan] = useState('');
-  const [mpin, setMpin] = useState('');
-  const [verifyingMpin, setVerifyingMpin] = useState(false);
+  const [tpin, setTpin] = useState('');
+  const [verifyingTpin, setVerifyingTpin] = useState(false);
   const [payingBill, setPayingBill] = useState(false);
   const [payResult, setPayResult] = useState<PayBillResponse | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
@@ -280,7 +280,7 @@ export const LiveBillPayment: React.FC = () => {
   const openPayModal = () => {
     setPayResult(null);
     setPayError(null);
-    setMpin('');
+    setTpin('');
     fetchChargeInfo(payAmount);
     setShowPayModal(true);
   };
@@ -301,10 +301,25 @@ export const LiveBillPayment: React.FC = () => {
       alert('Customer PAN Card (10 digits) is mandatory for cash payments >= ₹50,000 as per RBI guidelines.');
       return;
     }
+    if (!tpin || tpin.length !== 4) {
+      setPayError('Please enter your 4-digit TPIN to authorize bill payment.');
+      return;
+    }
+
     setPayingBill(true);
+    setVerifyingTpin(true);
     setPayError(null);
 
     try {
+      // 1. Authorize with 4-Digit TPIN
+      const tpinRes = await authApi.verifyTpin(tpin);
+      if (!tpinRes.success) {
+        setPayError(tpinRes.message || 'Invalid 4-digit TPIN.');
+        setPayingBill(false);
+        setVerifyingTpin(false);
+        return;
+      }
+
       const formattedCustomerParams: CustomerParamItem[] = currentInputParams.map(p => ({
         name: p.paramName,
         value: paramValues[p.paramName] || ''
@@ -350,7 +365,7 @@ export const LiveBillPayment: React.FC = () => {
       window.dispatchEvent(new Event('wallet_updated'));
     } finally {
       setPayingBill(false);
-      setVerifyingMpin(false);
+      setVerifyingTpin(false);
     }
   };
 
@@ -1038,6 +1053,25 @@ export const LiveBillPayment: React.FC = () => {
                   </div>
                 )}
 
+                {/* 4-Digit TPIN Input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                    Enter 4-Digit TPIN <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    required
+                    placeholder="••••"
+                    value={tpin}
+                    onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 text-center">
+                    Enter your secret 4-digit transaction PIN to authorize payment
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-3 pt-2">
                   <button
                     type="button"
@@ -1048,11 +1082,11 @@ export const LiveBillPayment: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={payingBill || (chargeInfo ? !chargeInfo.hasSufficientBalance : false)}
+                    disabled={payingBill || verifyingTpin || tpin.length !== 4 || (chargeInfo ? !chargeInfo.hasSufficientBalance : false)}
                     className="w-1/2 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition"
                   >
-                    <ShieldCheck className={`w-4 h-4 ${payingBill || verifyingMpin ? 'animate-spin' : ''}`} />
-                    <span>{payingBill ? 'Processing Pay...' : 'Confirm & Pay Bill'}</span>
+                    <ShieldCheck className={`w-4 h-4 ${payingBill || verifyingTpin ? 'animate-spin' : ''}`} />
+                    <span>{payingBill || verifyingTpin ? 'Verifying & Paying...' : 'Confirm & Pay Bill'}</span>
                   </button>
                 </div>
               </form>

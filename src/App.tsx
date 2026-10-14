@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { LoginSplitScreen } from './components/auth/LoginSplitScreen';
 import { ForceChangePasswordModal } from './components/auth/ForceChangePasswordModal';
 import { CreateMpinModal } from './components/auth/CreateMpinModal';
+import { CreateTpinModal } from './components/auth/CreateTpinModal';
 import { ResetPinOtpModal } from './components/auth/ResetPinOtpModal';
 import { AdminDashboard } from './components/dashboards/AdminDashboard';
 import { AdminOverviewDashboard } from './components/dashboards/AdminOverviewDashboard';
@@ -328,7 +329,12 @@ export default function App() {
     return <CreateMpinModal isOpen={true} user={user} />;
   }
 
-  // 4. Mandatory KYC Guard (Applies to all non-admin users: Retailer, Distributor, Super Distributor)
+  // 4. Mandatory 4-Digit TPIN Setup Guard (Financial Security for Live Bill Pay & Payout)
+  if (user.role !== 'admin' && !user.tpin_set) {
+    return <CreateTpinModal isOpen={true} user={user} />;
+  }
+
+  // 5. Mandatory KYC Guard (Applies to all non-admin users: Retailer, Distributor, Super Distributor)
   if (user.role !== 'admin') {
     const kycStatus = user.kyc_status || 'not_submitted';
 

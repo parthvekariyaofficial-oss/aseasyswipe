@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { payoutApi, userApi } from '../../services/api';
+import { payoutApi, userApi, authApi } from '../../services/api';
 import type { PayoutTransaction, PayoutCalculation } from '../../types/payout';
 import { PayoutReceiptModal } from './PayoutReceiptModal';
 import {
@@ -29,8 +29,10 @@ export const UserPayoutTransfer: React.FC = () => {
   const [calculation, setCalculation] = useState<PayoutCalculation | null>(null);
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
 
-  // Confirmation Modal & Processing State (No TPIN required)
+  // Confirmation Modal & Processing State with TPIN verification
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [tpin, setTpin] = useState<string>('');
+  const [verifyingTpin, setVerifyingTpin] = useState<boolean>(false);
   const [transferLoading, setTransferLoading] = useState<boolean>(false);
   const [formError, setFormError] = useState<string>('');
   const [confirmError, setConfirmError] = useState<string>('');
@@ -236,7 +238,8 @@ export const UserPayoutTransfer: React.FC = () => {
       return;
     }
 
-    // Open Confirmation Modal (No TPIN required)
+    // Open Confirmation Modal with TPIN authorization
+    setTpin('');
     setConfirmError('');
     setRefundNotice('');
     setShowConfirmModal(true);
@@ -244,13 +247,28 @@ export const UserPayoutTransfer: React.FC = () => {
 
   const handleExecutePayout = async () => {
     // Guard against double clicks / double calls
-    if (transferLoading) return;
+    if (transferLoading || verifyingTpin) return;
 
+    if (!tpin || tpin.length !== 4) {
+      setConfirmError('Please enter your 4-digit TPIN to authorize this transfer.');
+      return;
+    }
+
+    setVerifyingTpin(true);
     setTransferLoading(true);
     setConfirmError('');
     setRefundNotice('');
 
     try {
+      // 1. Authorize with 4-Digit TPIN
+      const tpinRes = await authApi.verifyTpin(tpin);
+      if (!tpinRes.success) {
+        setConfirmError(tpinRes.message || 'Invalid 4-digit TPIN.');
+        setTransferLoading(false);
+        setVerifyingTpin(false);
+        return;
+      }
+
       const res = await payoutApi.transfer({
         amount: parseFloat(amount),
         account_number: accountNumber.trim(),
@@ -939,6 +957,25 @@ export const UserPayoutTransfer: React.FC = () => {
               </div>
             </div>
 
+            {/* 4-Digit TPIN Input */}
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+              <label className="block text-xs font-bold text-slate-300">
+                Enter 4-Digit TPIN <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="password"
+                maxLength={4}
+                required
+                placeholder="••••"
+                value={tpin}
+                onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
+                className="w-full bg-slate-900 border border-slate-750 rounded-xl p-3 text-base text-center font-mono tracking-widest text-white focus:outline-none focus:border-indigo-500"
+              />
+              <p className="text-[10px] text-slate-400 text-center">
+                Enter your 4-digit secret transaction PIN to authorize this transfer
+              </p>
+            </div>
+
             {confirmError && (
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-xs">
                 {confirmError}
@@ -954,7 +991,7 @@ export const UserPayoutTransfer: React.FC = () => {
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                disabled={transferLoading}
+                disabled={transferLoading || verifyingTpin}
                 onClick={() => setShowConfirmModal(false)}
                 className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 rounded-xl font-bold text-xs transition-colors cursor-pointer"
               >
@@ -963,15 +1000,15 @@ export const UserPayoutTransfer: React.FC = () => {
               <button
                 type="button"
                 onClick={handleExecutePayout}
-                disabled={transferLoading}
+                disabled={transferLoading || verifyingTpin || tpin.length !== 4}
                 className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
               >
-                {transferLoading ? (
+                {transferLoading || verifyingTpin ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Processing...
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Verifying & Processing...
                   </>
                 ) : (
-                  <>Confirm & Transfer</>
+                  <>Authorize & Transfer</>
                 )}
               </button>
             </div>
