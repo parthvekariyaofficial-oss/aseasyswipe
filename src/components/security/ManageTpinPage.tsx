@@ -3,121 +3,90 @@ import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/api';
 import { 
   ShieldCheck, Lock, Key, CheckCircle2, AlertCircle, Eye, EyeOff, 
-  MessageSquare, RefreshCw, Smartphone, ShieldAlert, ArrowRight, Zap, Check
+  RefreshCw, ShieldAlert, Zap, Check, ArrowRight, HelpCircle
 } from 'lucide-react';
 
 export const ManageTpinPage: React.FC = () => {
   const { user, updateUser } = useAuthStore();
 
-  // Active Tab: 'set' (Create/Change) or 'reset' (Forgot/Reset via OTP)
-  const [activeMode, setActiveMode] = useState<'set' | 'reset'>('set');
+  // Verification method: 'old_tpin' | 'mpin' | 'password'
+  const [verificationMethod, setVerificationMethod] = useState<'old_tpin' | 'mpin' | 'password'>('old_tpin');
+  
+  // Verification input values
+  const [oldTpin, setOldTpin] = useState('');
+  const [mpin, setMpin] = useState('');
+  const [password, setPassword] = useState('');
 
-  // Direct Set / Change TPIN State
-  const [tpin, setTpin] = useState('');
+  // New TPIN values
+  const [newTpin, setNewTpin] = useState('');
   const [confirmTpin, setConfirmTpin] = useState('');
-  const [showTpin, setShowTpin] = useState(false);
-  const [setLoading, setSetLoading] = useState(false);
-  const [setSuccessMsg, setSetSuccessMsg] = useState<string | null>(null);
-  const [setErrorMsg, setSetErrorMsg] = useState<string | null>(null);
+  const [showNewTpin, setShowNewTpin] = useState(false);
+  const [showVerificationSecret, setShowVerificationSecret] = useState(false);
 
-  // Forgot / Reset OTP State
-  const [channel] = useState<'WHATSAPP'>('WHATSAPP');
-  const [otpSent, setOtpSent] = useState(false);
-  const [demoOtp, setDemoOtp] = useState<string | null>(null);
-  const [otpCode, setOtpCode] = useState('');
-  const [newResetTpin, setNewResetTpin] = useState('');
-  const [showResetTpin, setShowResetTpin] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
-  const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+  // Status & Feedback
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const isFourDigits = tpin.length === 4 && /^\d+$/.test(tpin);
-  const isMatch = tpin.length > 0 && tpin === confirmTpin;
+  const isFourDigits = newTpin.length === 4 && /^\d+$/.test(newTpin);
+  const isMatch = newTpin.length > 0 && newTpin === confirmTpin;
 
-  // Handle Direct Set / Change TPIN
-  const handleSetTpinSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isFourDigits || !isMatch) return;
-
-    setSetLoading(true);
-    setSetErrorMsg(null);
-    setSetSuccessMsg(null);
-
-    try {
-      const res = await authApi.createTpin(tpin);
-      const updatedProfile = { ...(res.user || user), tpin, tpin_set: true };
-      updateUser(updatedProfile as any);
-      setSetSuccessMsg(res.message || '4-digit TPIN successfully saved and activated!');
-      setTpin('');
-      setConfirmTpin('');
-    } catch (err: any) {
-      console.error('Failed to set TPIN:', err);
-      const msg = err.response?.data?.message || err.message || 'Failed to save TPIN. Please try again.';
-      setSetErrorMsg(msg);
-    } finally {
-      setSetLoading(false);
-    }
+  // Check if current verification value is valid
+  const isVerificationReady = () => {
+    if (!user?.tpin_set) return true; // First time, no verification needed
+    if (verificationMethod === 'old_tpin') return oldTpin.length === 4 && /^\d+$/.test(oldTpin);
+    if (verificationMethod === 'mpin') return mpin.length === 6 && /^\d+$/.test(mpin);
+    if (verificationMethod === 'password') return password.trim().length >= 6;
+    return false;
   };
 
-  // Handle Request OTP for Reset
-  const handleRequestOtp = async () => {
-    setResetLoading(true);
-    setResetErrorMsg(null);
-    setResetSuccessMsg(null);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFourDigits || !isMatch || !isVerificationReady()) return;
+
+    setLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
-      const res = await authApi.requestOtp({
-        purpose: 'RESET_TPIN',
-        channel
-      });
-
-      if (res.success) {
-        setOtpSent(true);
-        if (res.demoOtpCode) setDemoOtp(res.demoOtpCode);
-        setResetSuccessMsg(res.message || 'OTP sent successfully to your WhatsApp!');
+      if (!user?.tpin_set) {
+        // First-time setup
+        const res = await authApi.createTpin(newTpin);
+        updateUser({ ...(res.user || user), tpin: newTpin, tpin_set: true } as any);
+        setSuccessMsg(res.message || '4-Digit TPIN successfully created!');
+        setNewTpin('');
+        setConfirmTpin('');
       } else {
-        setResetErrorMsg(res.message || 'Failed to send OTP.');
-      }
-    } catch (err: any) {
-      setResetErrorMsg(err.response?.data?.message || 'Error communicating with OTP service.');
-    } finally {
-      setResetLoading(false);
-    }
-  };
+        // Multi-tier reset (Old TPIN -> MPIN -> Password)
+        let verificationValue = '';
+        if (verificationMethod === 'old_tpin') verificationValue = oldTpin.trim();
+        if (verificationMethod === 'mpin') verificationValue = mpin.trim();
+        if (verificationMethod === 'password') verificationValue = password.trim();
 
-  // Handle Submit Reset TPIN with OTP
-  const handleResetSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newResetTpin.length !== 4 || !/^\d+$/.test(newResetTpin)) {
-      setResetErrorMsg('New TPIN must be exactly 4 numeric digits.');
-      return;
-    }
-    if (!otpCode || otpCode.length !== 6) {
-      setResetErrorMsg('Please enter the 6-digit OTP code.');
-      return;
-    }
+        const res = await authApi.resetTpin({
+          newTpin,
+          verificationType: verificationMethod,
+          verificationValue
+        });
 
-    setResetLoading(true);
-    setResetErrorMsg(null);
-    setResetSuccessMsg(null);
-
-    try {
-      const res = await authApi.resetTpin({ otpCode, newTpin: newResetTpin });
-      if (res.success) {
-        setResetSuccessMsg(res.message || '4-digit TPIN reset successfully!');
-        if (user) {
-          updateUser({ ...user, tpin: newResetTpin, tpin_set: true });
+        if (res.success) {
+          updateUser({ ...(res.user || user), tpin: newTpin, tpin_set: true } as any);
+          setSuccessMsg(res.message || '4-Digit TPIN successfully updated!');
+          setOldTpin('');
+          setMpin('');
+          setPassword('');
+          setNewTpin('');
+          setConfirmTpin('');
+        } else {
+          setErrorMsg(res.message || 'Failed to update TPIN.');
         }
-        setOtpCode('');
-        setNewResetTpin('');
-        setOtpSent(false);
-      } else {
-        setResetErrorMsg(res.message || 'Failed to reset TPIN.');
       }
     } catch (err: any) {
-      setResetErrorMsg(err.response?.data?.message || 'Failed to reset TPIN. Please check the OTP.');
+      console.error('TPIN Update Error:', err);
+      const apiMsg = err.response?.data?.message || err.message || 'Failed to process TPIN update.';
+      setErrorMsg(apiMsg);
     } finally {
-      setResetLoading(false);
+      setLoading(false);
     }
   };
 
@@ -136,20 +105,20 @@ export const ManageTpinPage: React.FC = () => {
               </span>
               {user?.tpin_set ? (
                 <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black uppercase flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> TPIN Active
+                  <CheckCircle2 className="w-3 h-3" /> TPIN Configured
                 </span>
               ) : (
                 <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black uppercase flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> Not Configured
+                  <AlertCircle className="w-3 h-3" /> Not Set Yet
                 </span>
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2 mt-2">
               <Key className="w-7 h-7 text-emerald-400" />
-              4-Digit Financial TPIN
+              4-Digit Financial TPIN Security
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-              Your secret 4-digit Transaction PIN protects your funds and authorizes every <strong>Live Bill Pay</strong> and <strong>Instant Payout</strong> transfer.
+              Manage your 4-digit secret Transaction PIN used to authorize <strong>Live Bill Pay</strong> and <strong>Instant Payout</strong> transactions.
             </p>
           </div>
 
@@ -160,114 +129,270 @@ export const ManageTpinPage: React.FC = () => {
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-400">Current Status</p>
               <p className="text-base font-black text-white">
-                {user?.tpin_set ? 'Protected & Active' : 'TPIN Pending'}
+                {user?.tpin_set ? 'Active & Protected' : 'Setup Required'}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* MODE TABS (SET / CHANGE vs FORGOT / RESET) */}
-      <div className="flex gap-2 p-1.5 bg-slate-900 border border-slate-800 rounded-2xl max-w-md">
-        <button
-          type="button"
-          onClick={() => {
-            setActiveMode('set');
-            setSetErrorMsg(null);
-            setSetSuccessMsg(null);
-          }}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-            activeMode === 'set'
-              ? 'bg-gradient-to-r from-emerald-600 to-indigo-600 text-white shadow-lg shadow-emerald-500/20'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Lock className="w-4 h-4" />
-          <span>{user?.tpin_set ? 'Change 4-Digit TPIN' : 'Create 4-Digit TPIN'}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveMode('reset');
-            setResetErrorMsg(null);
-            setResetSuccessMsg(null);
-          }}
-          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-            activeMode === 'reset'
-              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/20'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span>Forgot / Reset TPIN</span>
-        </button>
-      </div>
-
       {/* MAIN TWO-COLUMN LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* LEFT COLUMN: ACTIVE FORM CARD */}
+        {/* LEFT COLUMN: TPIN FORM CARD */}
         <div className="lg:col-span-7 space-y-6">
 
-          {/* TAB 1: CREATE / CHANGE TPIN FORM */}
-          {activeMode === 'set' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div>
-                <h3 className="text-lg font-black text-white flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  {user?.tpin_set ? 'Update Your 4-Digit TPIN' : 'Create Your 4-Digit TPIN'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Choose a secret 4-digit numeric code. Avoid common sequences like 1234 or 0000.
-                </p>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                {user?.tpin_set ? 'Change / Reset 4-Digit TPIN' : 'Create 4-Digit TPIN'}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                {user?.tpin_set
+                  ? 'Verify your identity using your Old TPIN, 6-digit MPIN, or Account Password to set a new 4-digit TPIN.'
+                  : 'Enter a secret 4-digit numeric code to protect all financial actions.'}
+              </p>
+            </div>
+
+            {successMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span className="font-semibold">{successMsg}</span>
               </div>
+            )}
 
-              {setSuccessMsg && (
-                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span className="font-semibold">{setSuccessMsg}</span>
+            {errorMsg && (
+              <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                <span className="font-semibold">{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+
+              {/* STEP 1: IDENTITY VERIFICATION (ONLY IF TPIN ALREADY SET) */}
+              {user?.tpin_set && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-indigo-400" /> Step 1: Verify Current Identity
+                    </span>
+
+                    {/* Method selector pills */}
+                    <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerificationMethod('old_tpin');
+                          setErrorMsg(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          verificationMethod === 'old_tpin'
+                            ? 'bg-emerald-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Old TPIN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerificationMethod('mpin');
+                          setErrorMsg(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          verificationMethod === 'mpin'
+                            ? 'bg-indigo-500 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        6-Digit MPIN
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerificationMethod('password');
+                          setErrorMsg(null);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          verificationMethod === 'password'
+                            ? 'bg-purple-500 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Password
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Verification Input by Method */}
+                  {verificationMethod === 'old_tpin' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Enter Current Old 4-Digit TPIN <span className="text-rose-400">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showVerificationSecret ? 'text' : 'password'}
+                          required
+                          maxLength={4}
+                          value={oldTpin}
+                          onChange={(e) => setOldTpin(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••"
+                          className="w-full bg-slate-900 border border-slate-750 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowVerificationSecret(!showVerificationSecret)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        >
+                          {showVerificationSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] pt-1">
+                        <span className="text-slate-400">Remember your current 4-digit PIN</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVerificationMethod('mpin');
+                            setErrorMsg(null);
+                          }}
+                          className="text-indigo-400 hover:text-indigo-300 font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Forgot Old TPIN? Use 6-Digit MPIN</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {verificationMethod === 'mpin' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Enter Your 6-Digit Login MPIN <span className="text-rose-400">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showVerificationSecret ? 'text' : 'password'}
+                          required
+                          maxLength={6}
+                          value={mpin}
+                          onChange={(e) => setMpin(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••••"
+                          className="w-full bg-slate-900 border border-slate-750 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowVerificationSecret(!showVerificationSecret)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        >
+                          {showVerificationSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVerificationMethod('old_tpin');
+                            setErrorMsg(null);
+                          }}
+                          className="text-slate-400 hover:text-white transition cursor-pointer"
+                        >
+                          ← Back to Old TPIN
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVerificationMethod('password');
+                            setErrorMsg(null);
+                          }}
+                          className="text-purple-400 hover:text-purple-300 font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Forgot MPIN? Use Password</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {verificationMethod === 'password' && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-300">
+                        Enter Your Account Login Password <span className="text-rose-400">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showVerificationSecret ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter your account login password"
+                          className="w-full bg-slate-900 border border-slate-750 focus:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowVerificationSecret(!showVerificationSecret)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        >
+                          {showVerificationSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] pt-1">
+                        <span className="text-slate-400">Master account password verification</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVerificationMethod('old_tpin');
+                            setErrorMsg(null);
+                          }}
+                          className="text-slate-400 hover:text-white transition cursor-pointer"
+                        >
+                          ← Back to Old TPIN
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {setErrorMsg && (
-                <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in">
-                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                  <span className="font-semibold">{setErrorMsg}</span>
-                </div>
-              )}
+              {/* STEP 2: ENTER NEW 4-DIGIT TPIN */}
+              <div className="space-y-4">
+                <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="w-4 h-4 text-emerald-400" />
+                  {user?.tpin_set ? 'Step 2: Enter New 4-Digit TPIN' : 'Enter 4-Digit TPIN'}
+                </span>
 
-              <form onSubmit={handleSetTpinSubmit} className="space-y-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Enter New 4-Digit TPIN <span className="text-rose-400">*</span>
+                    New 4-Digit TPIN <span className="text-rose-400">*</span>
                   </label>
                   <div className="relative">
                     <input
-                      type={showTpin ? 'text' : 'password'}
+                      type={showNewTpin ? 'text' : 'password'}
                       required
                       maxLength={4}
-                      value={tpin}
-                      onChange={(e) => setTpin(e.target.value.replace(/\D/g, ''))}
+                      value={newTpin}
+                      onChange={(e) => setNewTpin(e.target.value.replace(/\D/g, ''))}
                       placeholder="••••"
                       className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowTpin(!showTpin)}
+                      onClick={() => setShowNewTpin(!showNewTpin)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                     >
-                      {showTpin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showNewTpin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                    Confirm 4-Digit TPIN <span className="text-rose-400">*</span>
+                    Confirm New 4-Digit TPIN <span className="text-rose-400">*</span>
                   </label>
                   <input
-                    type={showTpin ? 'text' : 'password'}
+                    type={showNewTpin ? 'text' : 'password'}
                     required
                     maxLength={4}
                     value={confirmTpin}
@@ -276,211 +401,128 @@ export const ManageTpinPage: React.FC = () => {
                     className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-2xl px-4 py-3 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
                   />
                 </div>
-
-                {/* Live validation indicators */}
-                <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 space-y-2 text-xs">
-                  <div className={`flex items-center space-x-2 transition-colors ${isFourDigits ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span>Exactly 4 numeric digits (0-9)</span>
-                  </div>
-                  <div className={`flex items-center space-x-2 transition-colors ${isMatch ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span>Both PIN fields match</span>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={setLoading || !isFourDigits || !isMatch}
-                  className="w-full py-4 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 disabled:opacity-40 text-white rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 transition-all cursor-pointer"
-                >
-                  {setLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Saving 4-Digit TPIN...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-5 h-5" />
-                      <span>Save & Activate 4-Digit TPIN</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* TAB 2: FORGOT / RESET TPIN VIA OTP */}
-          {activeMode === 'reset' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div>
-                <h3 className="text-lg font-black text-white flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-indigo-400" />
-                  Reset 4-Digit TPIN via WhatsApp OTP
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Verify your identity using a One-Time Password (OTP) sent directly to your registered mobile number: <strong className="text-indigo-300 font-mono">+91 {user?.mobile_number}</strong>
-                </p>
               </div>
 
-              {resetSuccessMsg && (
-                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs flex items-center space-x-2 animate-in fade-in">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span className="font-semibold">{resetSuccessMsg}</span>
+              {/* Validation indicators */}
+              <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 space-y-2 text-xs">
+                <div className={`flex items-center space-x-2 transition-colors ${isFourDigits ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>Exactly 4 numeric digits (0-9)</span>
                 </div>
-              )}
-
-              {resetErrorMsg && (
-                <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-center space-x-2 animate-in fade-in">
-                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                  <span className="font-semibold">{resetErrorMsg}</span>
+                <div className={`flex items-center space-x-2 transition-colors ${isMatch ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>Both PIN fields match</span>
                 </div>
-              )}
-
-              {!otpSent ? (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                    <p className="text-xs text-slate-300">
-                      We will dispatch a secure 6-digit verification code to your WhatsApp:
-                    </p>
-                    <p className="text-base font-bold text-emerald-400 font-mono">
-                      +91 {user?.mobile_number}
-                    </p>
+                {user?.tpin_set && (
+                  <div className={`flex items-center space-x-2 transition-colors ${isVerificationReady() ? 'text-emerald-400 font-bold' : 'text-amber-400'}`}>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>
+                      {verificationMethod === 'old_tpin' && 'Current Old TPIN entered'}
+                      {verificationMethod === 'mpin' && '6-digit MPIN entered'}
+                      {verificationMethod === 'password' && 'Password entered'}
+                    </span>
                   </div>
+                )}
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={handleRequestOtp}
-                    disabled={resetLoading}
-                    className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
-                  >
-                    {resetLoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Sending WhatsApp OTP...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Smartphone className="w-5 h-5" />
-                        <span>Send WhatsApp OTP Code</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetSubmit} className="space-y-5 animate-in fade-in">
-                  {demoOtp && (
-                    <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-xl text-xs text-indigo-300 flex items-center justify-between">
-                      <span>Demo Mode OTP Code:</span>
-                      <strong className="font-mono text-white text-sm bg-indigo-900/60 px-2 py-0.5 rounded">{demoOtp}</strong>
-                    </div>
-                  )}
+              <button
+                type="submit"
+                disabled={loading || !isFourDigits || !isMatch || !isVerificationReady()}
+                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 disabled:opacity-40 text-white rounded-2xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 transition-all cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verifying & Saving TPIN...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-5 h-5" />
+                    <span>{user?.tpin_set ? 'Verify & Update 4-Digit TPIN' : 'Save 4-Digit TPIN'}</span>
+                  </>
+                )}
+              </button>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Enter 6-Digit WhatsApp OTP <span className="text-rose-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                      placeholder="123456"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                      Enter New 4-Digit TPIN <span className="text-rose-400">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showResetTpin ? 'text' : 'password'}
-                        required
-                        maxLength={4}
-                        value={newResetTpin}
-                        onChange={(e) => setNewResetTpin(e.target.value.replace(/\D/g, ''))}
-                        placeholder="••••"
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base text-center font-mono tracking-widest text-white focus:outline-none transition-colors"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowResetTpin(!showResetTpin)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                      >
-                        {showResetTpin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setOtpSent(false)}
-                      className="w-1/3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
-                    >
-                      Resend OTP
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={resetLoading || otpCode.length !== 6 || newResetTpin.length !== 4}
-                      className="w-2/3 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition cursor-pointer"
-                    >
-                      {resetLoading ? 'Verifying...' : 'Verify OTP & Reset TPIN'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
+            </form>
+          </div>
 
         </div>
 
-        {/* RIGHT COLUMN: SECURITY GUIDELINES & NOTICE CARD */}
+        {/* RIGHT COLUMN: RECOVERY CASCADE EXPLANATION & SECURITY RULES */}
         <div className="lg:col-span-5 space-y-6">
           
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 space-y-5 shadow-xl">
+          {/* Recovery Hierarchy Guide */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 space-y-4 shadow-xl">
+            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-emerald-400" />
+              TPIN Reset Hierarchy (No OTP)
+            </h3>
+            <p className="text-xs text-slate-300">
+              You do not need to wait for mobile or WhatsApp OTPs! Reset your TPIN instantly using your existing credentials:
+            </p>
+
+            <div className="space-y-3 pt-2">
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0 text-xs">
+                  1
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-emerald-300">Level 1: Old 4-Digit TPIN</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    If you know your current TPIN, enter it directly to update to a new 4-digit PIN.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center shrink-0 text-xs">
+                  2
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-indigo-300">Level 2: 6-Digit Login MPIN</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Forgot your old TPIN? Simply enter your 6-digit Login MPIN to create a new TPIN immediately.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center shrink-0 text-xs">
+                  3
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-purple-300">Level 3: Account Password</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Forgot both TPIN and MPIN? Enter your main account login password to reset your TPIN anytime.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Security Rules Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 space-y-4 shadow-xl">
             <h3 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-indigo-400" />
-              TPIN Security Rules & Guide
+              Protection Notice
             </h3>
 
-            <div className="space-y-4 text-xs text-slate-300">
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
+            <div className="space-y-3 text-xs text-slate-300">
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
                 <p className="font-bold text-emerald-400 flex items-center gap-1.5">
-                  <Zap className="w-4 h-4" /> Required for Live Bill Pay
+                  <Zap className="w-4 h-4" /> Live Bill Pay & Payout
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Every time you execute a Credit Card or utility bill payment, entering your 4-digit TPIN is mandatory before wallet debit.
+                  Your 4-digit TPIN is required every time you pay a bill or perform an instant IMPS bank transfer.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
-                <p className="font-bold text-indigo-400 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4" /> Required for Instant Payout
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  Any bank transfer or payout to an IMPS account requires explicit TPIN authentication to avoid unauthorized transfers.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
                 <p className="font-bold text-amber-400 flex items-center gap-1.5">
-                  <Lock className="w-4 h-4" /> 3-Attempt Security Lockout
+                  <Lock className="w-4 h-4" /> 3-Attempt Lockout
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Entering an incorrect TPIN 3 consecutive times automatically locks financial transactions for 15 minutes as an anti-fraud protection measure.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-1">
-                <p className="font-bold text-purple-400 flex items-center gap-1.5">
-                  <Smartphone className="w-4 h-4" /> WhatsApp Recovery
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  Forgot your TPIN? You can instantly reset it using WhatsApp OTP verification on this page anytime.
+                  Entering an incorrect TPIN 3 times consecutively locks transactions for 15 minutes to protect your balance from unauthorized attempts.
                 </p>
               </div>
             </div>

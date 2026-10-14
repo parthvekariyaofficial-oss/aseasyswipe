@@ -64,7 +64,12 @@ export const authApi = {
     return response.data;
   },
 
-  resetTpin: async (data: { otpCode: string; newTpin: string }): Promise<{ success: boolean; message: string }> => {
+  resetTpin: async (data: { 
+    newTpin: string; 
+    verificationType?: 'old_tpin' | 'mpin' | 'password';
+    verificationValue?: string;
+    otpCode?: string;
+  }): Promise<{ success: boolean; message: string; user?: UserProfile }> => {
     const response = await apiClient.post('/auth/reset-tpin', data);
     return response.data;
   },
