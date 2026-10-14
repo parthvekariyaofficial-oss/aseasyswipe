@@ -30,6 +30,7 @@ import { KycUploadScreen } from './components/kyc/KycUploadScreen';
 import { KycUnderReviewScreen } from './components/kyc/KycUnderReviewScreen';
 import { AdminKycManagement } from './components/kyc/AdminKycManagement';
 import { ManageTpinPage } from './components/security/ManageTpinPage';
+import { ChangeMpinPage } from './components/security/ChangeMpinPage';
 import type { UserRole } from './types/auth';
 import { Menu, LogOut, Wallet, Clock, ChevronDown, Key, ShieldCheck } from 'lucide-react';
 
@@ -65,6 +66,9 @@ export default function App() {
     if (p.includes('manage-tpin') || p.includes('tpin')) {
       return role === 'admin' ? 'dashboard' : 'manage_tpin';
     }
+    if (p.includes('change-mpin') || p.includes('change_mpin')) {
+      return role === 'admin' ? 'dashboard' : 'change_mpin';
+    }
     if (p.includes('qr-master') || p.includes('qr_master')) return 'qr_master';
     if (p.includes('qr-gallery') || p.includes('qr_gallery')) return role === 'admin' ? 'qr_gallery' : 'dashboard';
     if (p.includes('qr-requests') || p.includes('qr_requests')) return 'qr_requests';
@@ -76,6 +80,7 @@ export default function App() {
   const getPathFromTab = (tab: string): string => {
     if (tab === 'dashboard') return '/dashboard';
     if (tab === 'manage_tpin') return '/manage-tpin';
+    if (tab === 'change_mpin') return '/change-mpin';
     if (tab === 'admin_kyc') return '/admin-kyc';
     if (tab === 'admin_payout') return '/admin-payout';
     if (tab === 'payout_transfer') return '/payout';
@@ -263,6 +268,8 @@ export default function App() {
         return 'Credit Card Bill Payment';
       case 'manage_tpin':
         return '4-Digit Financial TPIN';
+      case 'change_mpin':
+        return '6-Digit Login MPIN';
       default:
         return 'Dashboard';
     }
@@ -523,6 +530,11 @@ export default function App() {
               <ManageTpinPage />
             </ProtectedRoute>
           )}
+          {activeTab === 'change_mpin' && (
+            <ProtectedRoute allowedRoles={['user', 'distributor', 'super_distributor']}>
+              <ChangeMpinPage />
+            </ProtectedRoute>
+          )}
           {activeTab === 'qr_master' && <QRMasterManagement />}
           {activeTab === 'qr_requests' && <QRPaymentRequests />}
           {activeTab === 'qr_gallery' && (
@@ -531,7 +543,7 @@ export default function App() {
             </ProtectedRoute>
           )}
           {activeTab === 'users' && renderDashboardByRole(user.role)}
-          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'qr_gallery' && activeTab !== 'manage_tpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
+          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'qr_gallery' && activeTab !== 'manage_tpin' && activeTab !== 'change_mpin' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
     </div>

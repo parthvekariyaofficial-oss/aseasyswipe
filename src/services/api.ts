@@ -78,6 +78,15 @@ export const authApi = {
     const response = await apiClient.post('/auth/reset-mpin', data);
     return response.data;
   },
+
+  changeMpin: async (data: {
+    newMpin: string;
+    verificationType: 'old_mpin' | 'password';
+    verificationValue: string;
+  }): Promise<{ success: boolean; message: string; user?: UserProfile }> => {
+    const response = await apiClient.post('/auth/change-mpin', data);
+    return response.data;
+  },
 };
 
 export const userApi = {

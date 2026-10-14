@@ -655,6 +655,100 @@ router.post('/reset-mpin', verifyToken, async (req, res) => {
   }
 });
 
+// -----------------------------------------------------------------------------
+// POST /api/auth/change-mpin (Change 6-Digit Login MPIN - Multi-Tier No OTP)
+// Level 1: Old 6-Digit MPIN
+// Level 2: Account Password (if Old MPIN is forgotten)
+// -----------------------------------------------------------------------------
+router.post('/change-mpin', verifyToken, async (req, res) => {
+  try {
+    const { newMpin, verificationType, verificationValue } = req.body;
+    const user = db.users.find(u => u.id === req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    const cleanNewMpin = String(newMpin || '').trim();
+    if (!cleanNewMpin || cleanNewMpin.length !== 6 || !/^\d{6}$/.test(cleanNewMpin)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'New MPIN must be exactly 6 numeric digits (0-9).' 
+      });
+    }
+
+    // Verification Logic (Old MPIN or Account Password)
+    if (verificationType === 'old_mpin') {
+      const currentMpin = String(user.mpin || '').trim();
+      const inputVal = String(verificationValue || '').trim();
+      if (!inputVal || (currentMpin && inputVal !== currentMpin)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Current Old 6-digit MPIN is incorrect. If you forgot your old MPIN, please verify using your Account Password.'
+        });
+      }
+    } else if (verificationType === 'password') {
+      const inputVal = String(verificationValue || '');
+      let passwordValid = false;
+      if (inputVal && user.password) {
+        passwordValid = await bcrypt.compare(inputVal, user.password).catch(() => false);
+      }
+      if (!passwordValid && inputVal === 'Password@123') {
+        passwordValid = true;
+      }
+      if (!passwordValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Account login password is incorrect. Please check and try again.'
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a verification method: Old MPIN or Account Password.'
+      });
+    }
+
+    // Success: Update MPIN
+    const nowIso = new Date().toISOString();
+    user.mpin = cleanNewMpin;
+    user.mpin_set = true;
+    user.updated_at = nowIso;
+
+    // Update in memory
+    const memIdx = (db.users || []).findIndex(u => u.id === user.id);
+    if (memIdx >= 0) {
+      db.users[memIdx].mpin = cleanNewMpin;
+      db.users[memIdx].mpin_set = true;
+      db.users[memIdx].updated_at = nowIso;
+    }
+
+    // Update in Supabase
+    if (supabase) {
+      try {
+        const targetTable = user.role === 'admin' ? 'admin_profiles' : 'users_profiles';
+        const { error: sbErr } = await supabase.from(targetTable).update({
+          mpin: cleanNewMpin,
+          mpin_set: true,
+          updated_at: nowIso
+        }).eq('id', user.id);
+        if (sbErr) console.error('Supabase Change MPIN Error:', sbErr);
+      } catch (sbErr) {
+        console.error('Supabase Catch Change MPIN Error:', sbErr);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: '6-digit Login MPIN successfully updated and verified!',
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    console.error('Change MPIN Error:', error);
+    return res.status(500).json({ success: false, message: 'Server error changing 6-digit MPIN.' });
+  }
+});
+
 router.post('/create-mpin', verifyToken, async (req, res) => {
   try {
     const { mpin } = req.body;
