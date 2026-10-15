@@ -1203,10 +1203,23 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
 
   const generatedClientTxnId = client_transaction_id || ('TXN_ORD_' + Date.now() + '_' + Math.floor(1000 + Math.random() * 9000));
 
-  // 1. DOUBLE PAYMENT GUARD (Check for duplicate client_transaction_id)
+  // 1. DOUBLE PAYMENT GUARD (Check for duplicate client_transaction_id in memory & DB)
   const existingTxn = (db.bill_payments || []).find(t => t.client_transaction_id === generatedClientTxnId);
   if (existingTxn && existingTxn.status !== 'failed') {
     return res.status(400).json({ status: 'failed', message: 'Duplicate transaction submission detected. Please wait.' });
+  }
+
+  if (supabase) {
+    try {
+      const { data: existingDbTxn } = await supabase
+        .from('bbps_bill_payments')
+        .select('id, client_transaction_id, status')
+        .eq('client_transaction_id', generatedClientTxnId)
+        .limit(1);
+      if (existingDbTxn && existingDbTxn.length > 0 && existingDbTxn[0].status !== 'failed') {
+        return res.status(400).json({ status: 'failed', message: 'Duplicate transaction submission detected. Please wait.' });
+      }
+    } catch (e) {}
   }
 
   // 2. CALCULATE SLAB SERVICE CHARGE & TOTAL DEDUCTION
@@ -1302,9 +1315,40 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
     }
   }
 
-  // Helper for Auto Refund on Gateway Failure
+  // Helper for Auto Refund on Gateway Failure (Guaranteed Exactly Once - Idempotency Guard)
+  let isRefundExecuted = false;
+
   const refundUserWallet = async (reason) => {
-    const balanceAfterRefund = (currentUser?.wallet_balance || balanceAfterDeduction) + totalDeduction;
+    // STRICT DOUBLE REFUND PREVENTION GUARD
+    if (isRefundExecuted || newTxnEntry.refunded) {
+      console.warn(`[BBPS Double Refund Guard]: Refund already completed for txn ${generatedClientTxnId}. Skipping duplicate refund attempt.`);
+      return;
+    }
+    // Lock immediately before any async gap
+    isRefundExecuted = true;
+    newTxnEntry.refunded = true;
+    newTxnEntry.refunded_amount = totalDeduction;
+
+    // Fetch freshest wallet balance directly from Supabase to prevent stale state or double increments
+    let latestBalance = null;
+    if (supabase) {
+      try {
+        const { data: freshUser } = await supabase
+          .from('users_profiles')
+          .select('wallet_balance')
+          .eq('id', req.user.id)
+          .single();
+        if (freshUser && freshUser.wallet_balance !== undefined) {
+          latestBalance = Number(freshUser.wallet_balance);
+        }
+      } catch (e) {
+        console.warn('[BBPS Fresh Balance Fetch Warning]:', e.message);
+      }
+    }
+
+    const currentBase = latestBalance !== null ? latestBalance : Number(currentUser?.wallet_balance ?? balanceAfterDeduction);
+    const balanceAfterRefund = currentBase + totalDeduction;
+
     if (currentUser) currentUser.wallet_balance = balanceAfterRefund;
     if (memUser) memUser.wallet_balance = balanceAfterRefund;
 
@@ -1314,14 +1358,11 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
           wallet_balance: balanceAfterRefund,
           updated_at: new Date().toISOString()
         }).eq('id', req.user.id);
-        console.log(`[BBPS Wallet Refund]: Refunded ₹${totalDeduction} to User ${req.user.id}. New Balance: ₹${balanceAfterRefund}. Reason: ${reason}`);
+        console.log(`[BBPS Wallet Refund]: Refunded ₹${totalDeduction} to User ${req.user.id}. Base: ₹${currentBase}, New Balance: ₹${balanceAfterRefund}. Reason: ${reason}`);
       } catch (e) {
         console.warn('[BBPS Wallet Refund Error]:', e.message);
       }
     }
-
-    newTxnEntry.refunded = true;
-    newTxnEntry.refunded_amount = totalDeduction;
   };
 
   // 6. EXECUTE LIVE USEPAY B2B PAY-BILL API
