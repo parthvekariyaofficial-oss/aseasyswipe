@@ -15,6 +15,8 @@ const defaultCategoriesList: BillerCategory[] = [
   { category_id: 7, category_name: "Credit Card" }
 ];
 
+const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+
 export const LiveBillPayment: React.FC = () => {
   const { user } = useAuthStore();
   const { liveBillPayEnabled } = useSettingsStore();
@@ -296,11 +298,22 @@ export const LiveBillPayment: React.FC = () => {
       return;
     }
     if (chargeInfo && !chargeInfo.hasSufficientBalance) {
-      alert(`Insufficient Wallet Balance! Required: ₹${chargeInfo.totalDeduction.toLocaleString('en-IN')} (Bill: ₹${payAmount} + Charge: ₹${chargeInfo.serviceCharge}), Available: ₹${chargeInfo.walletBalance.toLocaleString('en-IN')}`);
+      setPayError(`Insufficient Wallet Balance! Required: ₹${chargeInfo.totalDeduction.toLocaleString('en-IN')} (Bill: ₹${payAmount} + Charge: ₹${chargeInfo.serviceCharge}), Available: ₹${chargeInfo.walletBalance.toLocaleString('en-IN')}`);
       return;
     }
-    if (paymentMode === 'Cash' && payAmount >= 50000 && (!customerPan || customerPan.length !== 10)) {
-      alert('Customer PAN Card (10 digits) is mandatory for cash payments >= ₹50,000 as per RBI guidelines.');
+
+    const cleanPan = customerPan.trim().toUpperCase();
+    if (paymentMode === 'Cash' && payAmount >= 50000) {
+      if (!cleanPan) {
+        setPayError('Customer PAN Card (10 digits) is mandatory for Cash payments of ₹50,000 or above as per RBI guidelines.');
+        return;
+      }
+      if (!PAN_REGEX.test(cleanPan)) {
+        setPayError('Invalid Customer PAN format! PAN must be 10 characters (5 letters, 4 numbers, 1 letter, e.g. ABCDE1234F).');
+        return;
+      }
+    } else if (cleanPan && !PAN_REGEX.test(cleanPan)) {
+      setPayError('Invalid Customer PAN format! PAN must be 10 characters (5 letters, 4 numbers, 1 letter, e.g. ABCDE1234F).');
       return;
     }
     if (!tpin || tpin.length !== 4) {
@@ -354,7 +367,7 @@ export const LiveBillPayment: React.FC = () => {
         customerParams: formattedCustomerParams,
         billerResponseInfo: rawBillerInfo,
         additionalInfo: rawAddInfo,
-        customerPan: customerPan || undefined
+        customerPan: cleanPan || undefined
       });
 
       setPayResult(payRes);
@@ -1040,18 +1053,65 @@ export const LiveBillPayment: React.FC = () => {
                   </select>
                 </div>
 
-                {paymentMode === 'Cash' && payAmount >= 50000 && (
-                  <div>
-                    <label className="block text-xs font-bold text-amber-400 mb-1">Customer PAN Card (Mandatory for Cash ≥ ₹50,000)</label>
-                    <input
-                      type="text"
-                      maxLength={10}
-                      required
-                      placeholder="e.g. ABCDE1234F"
-                      value={customerPan}
-                      onChange={(e) => setCustomerPan(e.target.value.toUpperCase())}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
-                    />
+                {/* CUSTOMER PAN CARD INPUT (MANDATORY FOR CASH >= 50,000 PER RBI RULE 114B, OPTIONAL OTHERWISE IF >= 50,000) */}
+                {payAmount >= 50000 && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-950/40 to-slate-950 border border-amber-500/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                        <span>Customer PAN Card</span>
+                        {paymentMode === 'Cash' ? (
+                          <span className="text-rose-400 font-extrabold">* (RBI Mandatory)</span>
+                        ) : (
+                          <span className="text-slate-400 text-[10px] font-normal">(Optional for Non-Cash)</span>
+                        )}
+                      </label>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-500/30">
+                        ₹{payAmount.toLocaleString('en-IN')} ≥ ₹50,000
+                      </span>
+                    </div>
+
+                    {paymentMode === 'Cash' && (
+                      <p className="text-[11px] text-amber-200/90 leading-tight">
+                        ⚠️ <strong>RBI Compliance (Rule 114B):</strong> As per Government of India guidelines, furnishing a 10-digit PAN Card is mandatory for cash payments of ₹50,000 and above.
+                      </p>
+                    )}
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={10}
+                        required={paymentMode === 'Cash'}
+                        placeholder="e.g. ABCDE1234F"
+                        value={customerPan}
+                        onChange={(e) => setCustomerPan(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+                        className={`w-full bg-slate-950 border rounded-xl p-3 text-sm font-mono tracking-widest text-white focus:outline-none transition ${
+                          customerPan.length === 10
+                            ? PAN_REGEX.test(customerPan)
+                              ? 'border-emerald-500/80 focus:border-emerald-500'
+                              : 'border-rose-500/80 focus:border-rose-500'
+                            : 'border-slate-800 focus:border-amber-500'
+                        }`}
+                      />
+                      {customerPan.length === 10 && (
+                        <div className="absolute right-3 top-3.5 flex items-center gap-1 text-[11px] font-bold">
+                          {PAN_REGEX.test(customerPan) ? (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 className="w-4 h-4" /> Valid PAN
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 flex items-center gap-1">
+                              <AlertCircle className="w-4 h-4" /> Invalid PAN Format
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {customerPan.length > 0 && customerPan.length < 10 && (
+                      <p className="text-[10px] text-slate-400">
+                        {10 - customerPan.length} characters remaining (Format: 5 letters + 4 digits + 1 letter)
+                      </p>
+                    )}
                   </div>
                 )}
 

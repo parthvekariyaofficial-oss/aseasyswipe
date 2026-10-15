@@ -229,9 +229,12 @@ CREATE TABLE IF NOT EXISTS public.bbps_bill_payments (
     status TEXT CHECK (status IN ('pending', 'approved', 'success', 'failed', 'rejected')) DEFAULT 'pending',
     status_message TEXT,
     customer_params JSONB,
+    customer_pan TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.bbps_bill_payments ADD COLUMN IF NOT EXISTS customer_pan TEXT;
 
 ALTER TABLE IF EXISTS public.bbps_bill_payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all access to bbps_bill_payments" ON public.bbps_bill_payments;

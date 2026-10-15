@@ -1019,6 +1019,8 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
   const targetBiller = (db.credit_card_billers && db.credit_card_billers.find(b => b.biller_id === billerId)) || { biller_name: billerId };
   const customerName = billerResponseInfo?.customerName || req.body.billerResponse?.customerName || 'VALUED CARD HOLDER';
 
+  const cleanPan = customerPan ? String(customerPan).trim().toUpperCase() : null;
+
   // 5. PRE-INSERT TRANSACTION RECORD IN DATABASE
   const newTxnEntry = {
     id: generatedClientTxnId,
@@ -1027,6 +1029,7 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
     biller_name: targetBiller.biller_name || billerId,
     customer_name: customerName,
     customer_mobile: mobile || '9876543210',
+    customer_pan: cleanPan,
     amount: numAmount,
     service_charge: serviceCharge,
     total_deducted: totalDeduction,
@@ -1116,8 +1119,8 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
     if (targetAddInfo !== undefined) {
       payload.additionalInfo = targetAddInfo;
     }
-    if (customerPan) {
-      payload.customerPan = customerPan;
+    if (cleanPan) {
+      payload.customerPan = cleanPan;
     }
 
     console.log('[UsePay Pay-Bill Request Payload]:', JSON.stringify(payload, null, 2));
