@@ -303,9 +303,9 @@ export const LiveBillPayment: React.FC = () => {
     }
 
     const cleanPan = customerPan.trim().toUpperCase();
-    if (paymentMode === 'Cash' && payAmount >= 50000) {
+    if (payAmount >= 50000) {
       if (!cleanPan) {
-        setPayError('Customer PAN Card (10 digits) is mandatory for Cash payments of ₹50,000 or above as per RBI guidelines.');
+        setPayError('Customer PAN Card (10 digits) is required for payments of ₹50,000 or above.');
         return;
       }
       if (!PAN_REGEX.test(cleanPan)) {
@@ -1039,48 +1039,18 @@ export const LiveBillPayment: React.FC = () => {
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Payment Mode</label>
-                  <select
-                    value={paymentMode}
-                    onChange={(e) => setPaymentMode(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none"
-                  >
-                    <option value="Cash">Cash</option>
-                    <option value="UPI">UPI Instant</option>
-                    <option value="Internet Banking">Internet Banking</option>
-                    <option value="Debit Card">Debit Card</option>
-                  </select>
-                </div>
-
-                {/* CUSTOMER PAN CARD INPUT (MANDATORY FOR CASH >= 50,000 PER RBI RULE 114B, OPTIONAL OTHERWISE IF >= 50,000) */}
+                {/* CUSTOMER PAN CARD INPUT (FOR >= 50,000) */}
                 {payAmount >= 50000 && (
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-950/40 to-slate-950 border border-amber-500/40 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
-                        <span>Customer PAN Card</span>
-                        {paymentMode === 'Cash' ? (
-                          <span className="text-rose-400 font-extrabold">* (RBI Mandatory)</span>
-                        ) : (
-                          <span className="text-slate-400 text-[10px] font-normal">(Optional for Non-Cash)</span>
-                        )}
-                      </label>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-200 border border-amber-500/30">
-                        ₹{payAmount.toLocaleString('en-IN')} ≥ ₹50,000
-                      </span>
-                    </div>
-
-                    {paymentMode === 'Cash' && (
-                      <p className="text-[11px] text-amber-200/90 leading-tight">
-                        ⚠️ <strong>RBI Compliance (Rule 114B):</strong> As per Government of India guidelines, furnishing a 10-digit PAN Card is mandatory for cash payments of ₹50,000 and above.
-                      </p>
-                    )}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Customer PAN Card <span className="text-rose-400">*</span>
+                    </label>
 
                     <div className="relative">
                       <input
                         type="text"
                         maxLength={10}
-                        required={paymentMode === 'Cash'}
+                        required
                         placeholder="e.g. ABCDE1234F"
                         value={customerPan}
                         onChange={(e) => setCustomerPan(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
@@ -1089,7 +1059,7 @@ export const LiveBillPayment: React.FC = () => {
                             ? PAN_REGEX.test(customerPan)
                               ? 'border-emerald-500/80 focus:border-emerald-500'
                               : 'border-rose-500/80 focus:border-rose-500'
-                            : 'border-slate-800 focus:border-amber-500'
+                            : 'border-slate-800 focus:border-indigo-500'
                         }`}
                       />
                       {customerPan.length === 10 && (
@@ -1100,18 +1070,12 @@ export const LiveBillPayment: React.FC = () => {
                             </span>
                           ) : (
                             <span className="text-rose-400 flex items-center gap-1">
-                              <AlertCircle className="w-4 h-4" /> Invalid PAN Format
+                              <AlertCircle className="w-4 h-4" /> Invalid PAN
                             </span>
                           )}
                         </div>
                       )}
                     </div>
-
-                    {customerPan.length > 0 && customerPan.length < 10 && (
-                      <p className="text-[10px] text-slate-400">
-                        {10 - customerPan.length} characters remaining (Format: 5 letters + 4 digits + 1 letter)
-                      </p>
-                    )}
                   </div>
                 )}
 
