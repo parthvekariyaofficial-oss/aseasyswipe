@@ -224,7 +224,7 @@ export const SuperDistributorDashboard: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 font-mono text-indigo-300">{member.mobile_number}</td>
                     <td className="py-3 px-4 font-mono font-bold text-purple-300">
-                      {member.qr_charge_percent !== undefined ? member.qr_charge_percent : member.charge_percentage || 0.50}%
+                      {member.qr_charge_percent !== undefined && member.qr_charge_percent !== null ? member.qr_charge_percent : (member.charge_percentage !== undefined && member.charge_percentage !== null ? member.charge_percentage : 0)}%
                     </td>
                     <td className="py-3 px-4 font-mono text-emerald-400 font-bold">
                       ₹{Number(member.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}

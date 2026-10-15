@@ -47,7 +47,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
 
   const [role, setRole] = useState<UserRole>(targetDefaultRole);
   const [assignedDistributorId, setAssignedDistributorId] = useState<string>('');
-  const [qrChargePercent, setQrChargePercent] = useState<string>('0.50');
+  const [qrChargePercent, setQrChargePercent] = useState<string>('');
 
   const parentOptions = React.useMemo(() => {
     const usersList = allUsers.length > 0 ? allUsers : distributors;
@@ -94,10 +94,10 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
         setFirmAddress(userToEdit.firm_address || '');
         setRole(userToEdit.role || targetDefaultRole);
         setAssignedDistributorId(userToEdit.distributor_id || '');
-        const chargeVal = userToEdit.qr_charge_percent !== undefined 
+        const chargeVal = userToEdit.qr_charge_percent !== undefined && userToEdit.qr_charge_percent !== null
           ? userToEdit.qr_charge_percent 
-          : (userToEdit.charge_percentage !== undefined ? userToEdit.charge_percentage : 0.50);
-        setQrChargePercent(String(chargeVal));
+          : (userToEdit.charge_percentage !== undefined && userToEdit.charge_percentage !== null ? userToEdit.charge_percentage : '');
+        setQrChargePercent(chargeVal !== '' ? String(chargeVal) : '');
         setPhotoPreview(userToEdit.profile_photo_url || null);
       } else {
         setFirstName('');
@@ -110,7 +110,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
         setFirmAddress('');
         setRole(targetDefaultRole);
         setAssignedDistributorId('');
-        setQrChargePercent('0.50');
+        setQrChargePercent('');
         setPhotoPreview(null);
       }
       setErrorMessage(null);
@@ -267,7 +267,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
     setLoading(true);
 
     try {
-      const parsedCharge = parseFloat(qrChargePercent);
+      const parsedCharge = qrChargePercent.trim() !== '' ? parseFloat(qrChargePercent) : 0;
+      const finalCharge = isNaN(parsedCharge) ? 0 : parsedCharge;
       const payload = {
         firstName,
         middleName,
@@ -280,8 +281,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
         firm_address: firmAddress,
         role,
         target_distributor_id: assignedDistributorId || null,
-        qr_charge_percent: isNaN(parsedCharge) ? 0.50 : parsedCharge,
-        charge_percentage: isNaN(parsedCharge) ? 0.50 : parsedCharge,
+        qr_charge_percent: finalCharge,
+        charge_percentage: finalCharge,
         profile_photo_url: photoPreview || ''
       };
 
@@ -648,7 +649,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="0.50"
+                      min="0"
+                      placeholder="0.00"
                       value={qrChargePercent}
                       onChange={(e) => setQrChargePercent(e.target.value)}
                       className="w-full pl-4 pr-10 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"

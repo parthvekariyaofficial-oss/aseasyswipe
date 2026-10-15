@@ -47,10 +47,16 @@ router.post('/transaction', verifyToken, (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid transaction amount.' });
     }
 
-    // Service Charge Calculation (e.g., 0.5% or custom service charge)
+    // Service Charge Calculation (e.g., custom service charge or user's charge percentage)
+    const userPctRaw = user.qr_charge_percent !== undefined && user.qr_charge_percent !== null
+      ? user.qr_charge_percent
+      : (user.charge_percentage !== undefined && user.charge_percentage !== null ? user.charge_percentage : 0);
+    const userPct = parseFloat(userPctRaw);
+    const validPct = isNaN(userPct) ? 0 : userPct;
+
     const serviceCharge = user.service_charge_enabled
       ? (user.custom_service_charge || 5.00)
-      : (txAmount * (user.charge_percentage || 0.5) / 100);
+      : (txAmount * (validPct / 100));
 
     const netDeduction = txAmount + serviceCharge;
 

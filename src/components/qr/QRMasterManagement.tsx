@@ -17,7 +17,7 @@ export const QRMasterManagement: React.FC = () => {
   const [name, setName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [upiId, setUpiId] = useState('');
-  const [defaultChargePercent, setDefaultChargePercent] = useState('0.50');
+  const [defaultChargePercent, setDefaultChargePercent] = useState('0.00');
   const [qrImageUrl, setQrImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -115,7 +115,7 @@ export const QRMasterManagement: React.FC = () => {
     setName('');
     setMobileNumber('');
     setUpiId('');
-    setDefaultChargePercent('0.50');
+    setDefaultChargePercent('0.00');
     setQrImageUrl('');
     setImagePreview(null);
     setEditingQrId(null);
@@ -135,11 +135,12 @@ export const QRMasterManagement: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const parsedQr = parseFloat(defaultChargePercent);
       const payload = {
         name,
         mobile_number: mobileNumber,
         upi_id: upiId,
-        default_charge_percent: parseFloat(defaultChargePercent) || 0.50,
+        default_charge_percent: isNaN(parsedQr) ? 0 : parsedQr,
         qr_image_url: qrImageUrl
       };
 
@@ -171,7 +172,7 @@ export const QRMasterManagement: React.FC = () => {
     setName(qr.name);
     setMobileNumber(qr.mobile_number);
     setUpiId(qr.upi_id);
-    setDefaultChargePercent(String(qr.default_charge_percent || 0.50));
+    setDefaultChargePercent(qr.default_charge_percent !== undefined && qr.default_charge_percent !== null ? String(qr.default_charge_percent) : '0.00');
     setQrImageUrl(qr.qr_image_url);
     setImagePreview(qr.qr_image_url);
     setActiveTab('master');
@@ -499,7 +500,7 @@ export const QRMasterManagement: React.FC = () => {
                         type="number"
                         step="0.01"
                         required
-                        placeholder="0.50"
+                        placeholder="0.00"
                         value={defaultChargePercent}
                         onChange={(e) => setDefaultChargePercent(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-purple-500 transition"

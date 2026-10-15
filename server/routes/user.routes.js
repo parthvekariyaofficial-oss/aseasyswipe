@@ -342,9 +342,15 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       }
     }
 
-    const userChargePct = qr_charge_percent !== undefined 
-      ? parseFloat(qr_charge_percent) 
-      : (charge_percentage !== undefined ? parseFloat(charge_percentage) : (userRole === 'user' ? 0.50 : 0.25));
+    let userChargePct = 0;
+    if (qr_charge_percent !== undefined && qr_charge_percent !== null && qr_charge_percent !== '') {
+      userChargePct = parseFloat(qr_charge_percent);
+    } else if (charge_percentage !== undefined && charge_percentage !== null && charge_percentage !== '') {
+      userChargePct = parseFloat(charge_percentage);
+    } else {
+      userChargePct = 0;
+    }
+    if (isNaN(userChargePct)) userChargePct = 0;
 
     const newUser = {
       id: newId,
@@ -365,6 +371,7 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       mpin: '123456',
       mpin_set: false,
       qr_charge_percent: userChargePct,
+      charge_percentage: userChargePct,
       distributor_id: distId,
       super_distributor_id: superDistId,
       kyc_status: userRole === 'admin' ? 'verified' : 'not_submitted',
@@ -523,11 +530,18 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
     if (profile_photo_url !== undefined) targetUser.profile_photo_url = profile_photo_url;
     if (target_distributor_id !== undefined) targetUser.distributor_id = target_distributor_id || null;
 
-    const newChargeVal = qr_charge_percent !== undefined 
-      ? parseFloat(qr_charge_percent) 
-      : (charge_percentage !== undefined ? parseFloat(charge_percentage) : undefined);
+    let newChargeVal = undefined;
+    if (qr_charge_percent !== undefined && qr_charge_percent !== null && qr_charge_percent !== '') {
+      const p = parseFloat(qr_charge_percent);
+      if (!isNaN(p)) newChargeVal = p;
+    } else if (charge_percentage !== undefined && charge_percentage !== null && charge_percentage !== '') {
+      const p = parseFloat(charge_percentage);
+      if (!isNaN(p)) newChargeVal = p;
+    } else if (qr_charge_percent === 0 || qr_charge_percent === '0' || charge_percentage === 0 || charge_percentage === '0') {
+      newChargeVal = 0;
+    }
 
-    if (newChargeVal !== undefined && !isNaN(newChargeVal)) {
+    if (newChargeVal !== undefined) {
       targetUser.qr_charge_percent = newChargeVal;
       targetUser.charge_percentage = newChargeVal;
     }

@@ -987,7 +987,7 @@ export const QRPaymentRequests: React.FC = () => {
 
                     {/* CHARGE (%) */}
                     <td className="p-4 font-mono text-slate-400">
-                      {r.charge_percent || 0.50}% (-₹{Number(r.charge_amount || 0).toFixed(2)})
+                      {(r.charge_percent !== undefined && r.charge_percent !== null ? r.charge_percent : 0)}% (-₹{Number(r.charge_amount || 0).toFixed(2)})
                     </td>
 
                     {/* DS COMMISSION (ADMIN OR DISTRIBUTOR) */}

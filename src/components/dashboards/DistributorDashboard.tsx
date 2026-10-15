@@ -232,7 +232,7 @@ export const DistributorDashboard: React.FC = () => {
                     </td>
                     <td className="p-3 font-mono">{r.mobile_number}</td>
                     <td className="p-3 font-mono font-bold text-purple-300">
-                      {r.qr_charge_percent !== undefined ? r.qr_charge_percent : r.charge_percentage || 0.50}%
+                      {r.qr_charge_percent !== undefined && r.qr_charge_percent !== null ? r.qr_charge_percent : (r.charge_percentage !== undefined && r.charge_percentage !== null ? r.charge_percentage : 0)}%
                     </td>
                     <td className="p-3 font-bold text-emerald-400 font-mono">
                       ₹{Number(r.wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}

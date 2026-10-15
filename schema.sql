@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.users_profiles (
     tpin_set BOOLEAN DEFAULT false,
     mpin VARCHAR(6) DEFAULT '123456',
     mpin_set BOOLEAN DEFAULT false,
-    qr_charge_percent NUMERIC(5,2) DEFAULT 0.50, -- % Charge cut per QR payment
+    qr_charge_percent NUMERIC(5,2) DEFAULT 0.00, -- % Charge cut per QR payment
     distributor_id TEXT REFERENCES public.users_profiles(id) ON DELETE SET NULL,
     super_distributor_id TEXT REFERENCES public.users_profiles(id) ON DELETE SET NULL,
     kyc_status TEXT CHECK (kyc_status IN ('not_submitted', 'under_review', 'verified', 'rejected')) DEFAULT 'not_submitted',
@@ -64,6 +64,7 @@ ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS must_change_password 
 ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';
 ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS profile_photo_url TEXT;
 ALTER TABLE IF EXISTS public.admin_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.users_profiles ALTER COLUMN qr_charge_percent SET DEFAULT 0.00;
 
 -- 2. QR MASTERS TABLE (Admin Managed QR Codes & Setup)
 CREATE TABLE IF NOT EXISTS public.qr_masters (
