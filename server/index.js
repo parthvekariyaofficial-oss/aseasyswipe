@@ -71,17 +71,15 @@ const distPath = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 
-  // Explicit handlers for fund request SPA routes to guarantee index.html is served
-  app.get(['/api-fund-request', '/fund-request', '/api-fund-request/*', '/fund-request/*'], (req, res) => {
-    return res.sendFile(path.join(distPath, 'index.html'));
-  });
-
-  app.get('*', (req, res, next) => {
-    // Only pass through actual backend API endpoints that start with /api/ or match /api
+  // SPA fallback: All non-API GET requests serve index.html
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api/') && req.path !== '/api') {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
     if (req.path.startsWith('/api/') || req.path === '/api') {
       return res.status(404).json({ success: false, message: `Cannot ${req.method} ${req.path}` });
     }
-    res.sendFile(path.join(distPath, 'index.html'));
+    next();
   });
 }
 
