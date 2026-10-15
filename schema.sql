@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS public.admin_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_admin_mobile ON public.admin_profiles(mobile_number);
 CREATE INDEX IF NOT EXISTS idx_admin_status ON public.admin_profiles(status);
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS plain_password TEXT DEFAULT 'Password@123';
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS profile_photo_url TEXT;
 ALTER TABLE IF EXISTS public.admin_profiles DISABLE ROW LEVEL SECURITY;
 
 -- 2. QR MASTERS TABLE (Admin Managed QR Codes & Setup)
