@@ -256,6 +256,8 @@ CREATE TABLE IF NOT EXISTS public.bbps_bill_payments (
 );
 
 ALTER TABLE public.bbps_bill_payments ADD COLUMN IF NOT EXISTS customer_pan TEXT;
+ALTER TABLE public.bbps_bill_payments ADD COLUMN IF NOT EXISTS firm_name TEXT;
+ALTER TABLE public.bbps_bill_payments ADD COLUMN IF NOT EXISTS card_last4 TEXT;
 
 ALTER TABLE IF EXISTS public.bbps_bill_payments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all access to bbps_bill_payments" ON public.bbps_bill_payments;

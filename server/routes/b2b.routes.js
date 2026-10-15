@@ -1062,6 +1062,98 @@ router.get('/calculate-charge', verifyToken, async (req, res) => {
 });
 
 /**
+ * Helper to safely extract last 4 digits of credit card number from transaction params/records
+ */
+export const extractCardLast4 = (item) => {
+  if (!item) return '';
+
+  if (item.card_last4) {
+    const clean = String(item.card_last4).replace(/\D/g, '');
+    if (clean.length >= 4) return clean.slice(-4);
+    if (clean.length > 0) return clean;
+    return String(item.card_last4).trim().slice(-4);
+  }
+
+  let params = item.customer_params || item.customerParams;
+  if (typeof params === 'string') {
+    try {
+      params = JSON.parse(params);
+    } catch {
+      params = [];
+    }
+  }
+
+  if (Array.isArray(params)) {
+    // 1st Priority: Param name explicitly mentions card / credit / last 4
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    // 2nd Priority: Param name mentions account / number (excluding mobile, phone, pan)
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      if (name.includes('account') || name.includes('acc') || name.includes('num')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    // 3rd Priority: Any 4-digit or 12-19 digit numeric param that is not 10-digit mobile
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      const digits = val.replace(/\D/g, '');
+      if (digits.length === 4) return digits;
+      if (digits.length >= 12 && digits.length <= 19 && digits.length !== 10) {
+        return digits.slice(-4);
+      }
+    }
+  } else if (params && typeof params === 'object') {
+    for (const [k, v] of Object.entries(params)) {
+      const name = k.toLowerCase();
+      const val = String(v ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4') || name.includes('account')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+  }
+
+  // Check additional_info or biller_response_info
+  const addInfo = item.additional_info || item.additionalInfo || item.biller_response_info || item.billerResponseInfo;
+  if (addInfo) {
+    const str = typeof addInfo === 'string' ? addInfo : JSON.stringify(addInfo);
+    const cardMatch = str.match(/card[^\d]*(\d{4})/i) || str.match(/account[^\d]*(\d{4})/i);
+    if (cardMatch && cardMatch[1]) return cardMatch[1];
+  }
+
+  return '';
+};
+
+/**
  * POST /api/b2b/pay-bill
  * Execute BBPS Bill Payment via UsePay B2B API with Slab Charge Deduction & Auto-Refund
  */
@@ -1147,11 +1239,15 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
   const customerName = billerResponseInfo?.customerName || req.body.billerResponse?.customerName || 'VALUED CARD HOLDER';
 
   const cleanPan = customerPan ? String(customerPan).trim().toUpperCase() : null;
+  const cardLast4 = extractCardLast4({ customer_params: customerParams, additional_info: additionalInfo, biller_response_info: billerResponseInfo });
+  const firmName = currentUser?.firm_name || req.user?.firm_name || '';
 
   // 5. PRE-INSERT TRANSACTION RECORD IN DATABASE
   const newTxnEntry = {
     id: generatedClientTxnId,
     user_id: req.user.id,
+    firm_name: firmName,
+    card_last4: cardLast4,
     biller_id: billerId,
     biller_name: targetBiller.biller_name || billerId,
     customer_name: customerName,
@@ -1366,15 +1462,65 @@ router.get('/history', verifyToken, async (req, res) => {
         : db.bill_payments.filter(p => p.user_id === req.user.id);
     }
 
+    // Build user profile map to enrich firm_name, user_name, user_mobile
+    let userMap = {};
+    if (supabase) {
+      try {
+        const { data: usersData } = await supabase
+          .from('users_profiles')
+          .select('id, name, firm_name, mobile_number, role');
+        if (Array.isArray(usersData)) {
+          usersData.forEach(u => {
+            if (u && u.id) userMap[u.id] = u;
+          });
+        }
+      } catch (err) {
+        console.warn('[BBPS History Users Fetch Warning]:', err.message);
+      }
+    }
+
+    (db.users || []).forEach(u => {
+      if (u && u.id && !userMap[u.id]) {
+        userMap[u.id] = u;
+      }
+    });
+
+    const enrichedHistory = historyData.map(item => {
+      const u = userMap[item.user_id] || (db.users || []).find(usr => usr.id === item.user_id);
+      const cardLast4 = item.card_last4 || extractCardLast4(item);
+      const firmName = item.firm_name || u?.firm_name || (u?.role === 'distributor' ? 'Distributor Firm' : 'Retailer Firm');
+      const userName = item.user_name || u?.name || item.user_id;
+      const userMobile = item.user_mobile || u?.mobile_number || '';
+
+      return {
+        ...item,
+        firm_name: firmName,
+        card_last4: cardLast4,
+        user_name: userName,
+        user_mobile: userMobile
+      };
+    });
+
     return res.status(200).json({
       status: 'success',
-      data: historyData
+      data: enrichedHistory
     });
   } catch (err) {
     console.error('[BBPS History Fetch Error]:', err.message);
+    const fallbackList = (db.bill_payments || []).filter(p => req.user.role === 'admin' || p.user_id === req.user?.id);
+    const enrichedFallback = fallbackList.map(item => {
+      const u = (db.users || []).find(usr => usr.id === item.user_id);
+      return {
+        ...item,
+        firm_name: item.firm_name || u?.firm_name || 'Retailer Firm',
+        card_last4: item.card_last4 || extractCardLast4(item),
+        user_name: item.user_name || u?.name || item.user_id,
+        user_mobile: item.user_mobile || u?.mobile_number || ''
+      };
+    });
     return res.status(200).json({
       status: 'success',
-      data: (db.bill_payments || []).filter(p => req.user.role === 'admin' || p.user_id === req.user?.id)
+      data: enrichedFallback
     });
   }
 });

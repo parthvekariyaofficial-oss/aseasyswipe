@@ -3,9 +3,101 @@ import { b2bApi } from '../../services/api';
 import { 
   Clock, Search, RefreshCw, CheckCircle2, AlertCircle, 
   Receipt, Landmark, ShieldCheck, UserCheck, ArrowUpRight,
-  X, RotateCcw, Activity, Zap, Check, Calendar, Filter
+  X, RotateCcw, Activity, Zap, Check, Calendar, Filter,
+  Building2, CreditCard
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
+
+/**
+ * Safely extract the last 4 digits of the card number from the transaction item
+ */
+const getCardLast4 = (item: any): string => {
+  if (!item) return '';
+
+  if (item.card_last4) {
+    const clean = String(item.card_last4).replace(/\D/g, '');
+    if (clean.length >= 4) return clean.slice(-4);
+    if (clean.length > 0) return clean;
+    return String(item.card_last4).trim().slice(-4);
+  }
+
+  let params = item.customer_params || item.customerParams;
+  if (typeof params === 'string') {
+    try {
+      params = JSON.parse(params);
+    } catch {
+      params = [];
+    }
+  }
+
+  if (Array.isArray(params)) {
+    // 1st Priority: Param name explicitly mentions card / credit / last 4
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    // 2nd Priority: Param name mentions account / number (excluding mobile, phone, pan)
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      if (name.includes('account') || name.includes('acc') || name.includes('num')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    // 3rd Priority: Any 4-digit or 12-19 digit numeric param that is not 10-digit mobile
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      const digits = val.replace(/\D/g, '');
+      if (digits.length === 4) return digits;
+      if (digits.length >= 12 && digits.length <= 19 && digits.length !== 10) {
+        return digits.slice(-4);
+      }
+    }
+  } else if (params && typeof params === 'object') {
+    for (const [k, v] of Object.entries(params)) {
+      const name = k.toLowerCase();
+      const val = String(v ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4') || name.includes('account')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+  }
+
+  const addInfo = item.additional_info || item.additionalInfo || item.biller_response_info || item.billerResponseInfo;
+  if (addInfo) {
+    const str = typeof addInfo === 'string' ? addInfo : JSON.stringify(addInfo);
+    const cardMatch = str.match(/card[^\d]*(\d{4})/i) || str.match(/account[^\d]*(\d{4})/i);
+    if (cardMatch && cardMatch[1]) return cardMatch[1];
+  }
+
+  return '';
+};
 
 export const AdminLiveBillPayHistory: React.FC = () => {
   const [historyList, setHistoryList] = useState<any[]>([]);
@@ -172,6 +264,7 @@ export const AdminLiveBillPayHistory: React.FC = () => {
     // 3. Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
+      const card4 = getCardLast4(item);
       const matchesSearch = 
         (item.biller_name || '').toLowerCase().includes(q) ||
         (item.biller_id || '').toLowerCase().includes(q) ||
@@ -179,7 +272,10 @@ export const AdminLiveBillPayHistory: React.FC = () => {
         (item.customer_mobile || '').toLowerCase().includes(q) ||
         (item.client_transaction_id || '').toLowerCase().includes(q) ||
         (item.bbps_txn_ref_id || '').toLowerCase().includes(q) ||
-        (item.user_id || '').toLowerCase().includes(q);
+        (item.user_id || '').toLowerCase().includes(q) ||
+        (item.firm_name || '').toLowerCase().includes(q) ||
+        (item.user_name || '').toLowerCase().includes(q) ||
+        card4.toLowerCase().includes(q);
       if (!matchesSearch) return false;
     }
 
@@ -460,8 +556,9 @@ export const AdminLiveBillPayHistory: React.FC = () => {
               <thead className="bg-slate-950 text-[10px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="p-3.5">Date & Time</th>
-                  <th className="p-3.5">Merchant / User ID</th>
+                  <th className="p-3.5">Merchant / Firm Name</th>
                   <th className="p-3.5">Biller Bank</th>
+                  <th className="p-3.5">Card (Last 4)</th>
                   <th className="p-3.5">Customer Name & Mobile</th>
                   <th className="p-3.5">Bill Amount (₹)</th>
                   <th className="p-3.5">Charge (₹)</th>
@@ -475,28 +572,48 @@ export const AdminLiveBillPayHistory: React.FC = () => {
                 {filteredHistory.map((item, idx) => {
                   const itemId = item.client_transaction_id || item.transaction_id || item.bbps_txn_ref_id || item.id;
                   const isCheckingThis = checkingStatusId === itemId;
+                  const cardLast4 = getCardLast4(item);
 
                   return (
                     <tr key={itemId || idx} className="hover:bg-slate-800/30 transition">
-                      <td className="p-3.5 text-slate-400 font-sans">
+                      <td className="p-3.5 text-slate-400 font-sans whitespace-nowrap">
                         {new Date(item.created_at || Date.now()).toLocaleString('en-IN', {
                           day: '2-digit', month: 'short', year: 'numeric',
                           hour: '2-digit', minute: '2-digit'
                         })}
                       </td>
                       <td className="p-3.5 font-sans">
-                        <p className="font-bold text-white flex items-center gap-1">
-                          <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
-                          {item.user_id || 'System User'}
-                        </p>
+                        <div className="space-y-0.5">
+                          <p className="font-extrabold text-white text-xs flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span>{item.firm_name || 'Retailer Firm'}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
+                            <UserCheck className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span>{item.user_id || 'System User'}</span>
+                            {item.user_name && item.user_name !== item.user_id && (
+                              <span className="text-slate-500 font-sans text-[10px]">({item.user_name})</span>
+                            )}
+                          </p>
+                        </div>
                       </td>
                       <td className="p-3.5">
                         <p className="font-bold text-white font-sans">{item.biller_name || item.biller_id}</p>
-                        <span className="text-[10px] text-indigo-400">{item.biller_id}</span>
+                        <span className="text-[10px] text-indigo-400 font-mono">{item.biller_id}</span>
+                      </td>
+                      <td className="p-3.5 font-sans whitespace-nowrap">
+                        {cardLast4 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider shadow-sm">
+                            <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            •••• {cardLast4}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-mono text-xs">•••• ----</span>
+                        )}
                       </td>
                       <td className="p-3.5 font-sans">
                         <p className="font-bold text-white">{item.customer_name || 'VALUED CARD HOLDER'}</p>
-                        <p className="text-[10px] text-slate-400">{item.customer_mobile || item.mobile}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">{item.customer_mobile || item.mobile}</p>
                       </td>
                       <td className="p-3.5 font-black text-white text-xs font-mono">
                         ₹{Number(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -637,6 +754,20 @@ export const AdminLiveBillPayHistory: React.FC = () => {
 
                   {/* Transaction Details Grid */}
                   <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 text-xs font-mono space-y-2.5">
+                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                      <span className="text-slate-400 font-sans">Merchant / Firm:</span>
+                      <span className="font-bold text-white font-sans text-right">
+                        {statusModal.item.firm_name ? `${statusModal.item.firm_name} (${statusModal.item.user_id})` : (statusModal.item.user_id || 'N/A')}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                      <span className="text-slate-400 font-sans">Card (Last 4):</span>
+                      <span className="font-bold text-purple-300 font-mono">
+                        {getCardLast4(statusModal.item) ? `•••• ${getCardLast4(statusModal.item)}` : 'N/A'}
+                      </span>
+                    </div>
+
                     <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
                       <span className="text-slate-400 font-sans">Biller:</span>
                       <span className="font-bold text-white font-sans">{statusModal.item.biller_name || statusModal.item.biller_id}</span>

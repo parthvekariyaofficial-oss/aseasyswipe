@@ -17,6 +17,94 @@ const defaultCategoriesList: BillerCategory[] = [
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 
+/**
+ * Safely extract the last 4 digits of the card number from the transaction item
+ */
+const getCardLast4 = (item: any): string => {
+  if (!item) return '';
+
+  if (item.card_last4) {
+    const clean = String(item.card_last4).replace(/\D/g, '');
+    if (clean.length >= 4) return clean.slice(-4);
+    if (clean.length > 0) return clean;
+    return String(item.card_last4).trim().slice(-4);
+  }
+
+  let params = item.customer_params || item.customerParams;
+  if (typeof params === 'string') {
+    try {
+      params = JSON.parse(params);
+    } catch {
+      params = [];
+    }
+  }
+
+  if (Array.isArray(params)) {
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      if (name.includes('account') || name.includes('acc') || name.includes('num')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+
+    for (const p of params) {
+      if (!p) continue;
+      const name = String(p.name || p.paramName || p.key || p.label || '').toLowerCase();
+      const val = String(p.value ?? p.val ?? '').trim();
+      if (!val || name.includes('mobile') || name.includes('phone') || name.includes('pan')) continue;
+
+      const digits = val.replace(/\D/g, '');
+      if (digits.length === 4) return digits;
+      if (digits.length >= 12 && digits.length <= 19 && digits.length !== 10) {
+        return digits.slice(-4);
+      }
+    }
+  } else if (params && typeof params === 'object') {
+    for (const [k, v] of Object.entries(params)) {
+      const name = k.toLowerCase();
+      const val = String(v ?? '').trim();
+      if (!val) continue;
+
+      if (name.includes('card') || name.includes('credit') || name.includes('last 4') || name.includes('last4') || name.includes('account')) {
+        const digits = val.replace(/\D/g, '');
+        if (digits.length >= 4) return digits.slice(-4);
+        if (digits.length > 0) return digits;
+        return val.slice(-4);
+      }
+    }
+  }
+
+  const addInfo = item.additional_info || item.additionalInfo || item.biller_response_info || item.billerResponseInfo;
+  if (addInfo) {
+    const str = typeof addInfo === 'string' ? addInfo : JSON.stringify(addInfo);
+    const cardMatch = str.match(/card[^\d]*(\d{4})/i) || str.match(/account[^\d]*(\d{4})/i);
+    if (cardMatch && cardMatch[1]) return cardMatch[1];
+  }
+
+  return '';
+};
+
 export const LiveBillPayment: React.FC = () => {
   const { user } = useAuthStore();
   const { liveBillPayEnabled } = useSettingsStore();
@@ -141,13 +229,15 @@ export const LiveBillPayment: React.FC = () => {
     // 3. Search Query
     if (historySearchQuery.trim()) {
       const q = historySearchQuery.trim().toLowerCase();
+      const card4 = getCardLast4(item);
       const matchesSearch = 
         (item.biller_name || '').toLowerCase().includes(q) ||
         (item.biller_id || '').toLowerCase().includes(q) ||
         (item.customer_name || '').toLowerCase().includes(q) ||
         (item.customer_mobile || '').toLowerCase().includes(q) ||
         (item.client_transaction_id || '').toLowerCase().includes(q) ||
-        (item.bbps_txn_ref_id || '').toLowerCase().includes(q);
+        (item.bbps_txn_ref_id || '').toLowerCase().includes(q) ||
+        card4.toLowerCase().includes(q);
       if (!matchesSearch) return false;
     }
 
@@ -898,6 +988,7 @@ export const LiveBillPayment: React.FC = () => {
                 <tr>
                   <th className="p-3.5">Date & Time</th>
                   <th className="p-3.5">Biller Bank</th>
+                  <th className="p-3.5">Card (Last 4)</th>
                   <th className="p-3.5">Customer Name & Mobile</th>
                   <th className="p-3.5">Bill Amount (₹)</th>
                   <th className="p-3.5">Charge (₹)</th>
@@ -907,22 +998,34 @@ export const LiveBillPayment: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {filteredHistoryList.map((item, idx) => (
-                  <tr key={item.client_transaction_id || item.id || idx} className="hover:bg-slate-800/30 transition">
-                    <td className="p-3.5 text-slate-400 font-sans">
-                      {new Date(item.created_at || Date.now()).toLocaleString('en-IN', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                      })}
-                    </td>
-                    <td className="p-3.5">
-                      <p className="font-bold text-white font-sans">{item.biller_name || item.biller_id}</p>
-                      <span className="text-[10px] text-indigo-400">{item.biller_id}</span>
-                    </td>
-                    <td className="p-3.5 font-sans">
-                      <p className="font-bold text-white">{item.customer_name || 'VALUED CARD HOLDER'}</p>
-                      <p className="text-[10px] text-slate-400">{item.customer_mobile || item.mobile}</p>
-                    </td>
+                {filteredHistoryList.map((item, idx) => {
+                  const cardLast4 = getCardLast4(item);
+                  return (
+                    <tr key={item.client_transaction_id || item.id || idx} className="hover:bg-slate-800/30 transition">
+                      <td className="p-3.5 text-slate-400 font-sans whitespace-nowrap">
+                        {new Date(item.created_at || Date.now()).toLocaleString('en-IN', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="p-3.5">
+                        <p className="font-bold text-white font-sans">{item.biller_name || item.biller_id}</p>
+                        <span className="text-[10px] text-indigo-400 font-mono">{item.biller_id}</span>
+                      </td>
+                      <td className="p-3.5 font-sans whitespace-nowrap">
+                        {cardLast4 ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider shadow-sm">
+                            <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            •••• {cardLast4}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-mono text-xs">•••• ----</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 font-sans">
+                        <p className="font-bold text-white">{item.customer_name || 'VALUED CARD HOLDER'}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">{item.customer_mobile || item.mobile}</p>
+                      </td>
                     <td className="p-3.5 font-black text-white text-xs font-mono">
                       ₹{Number(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
@@ -956,7 +1059,8 @@ export const LiveBillPayment: React.FC = () => {
                       )}
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
