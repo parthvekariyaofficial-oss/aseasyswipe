@@ -68,12 +68,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, '../dist');
 
+// Serve uploaded receipts and assets statically
+const uploadsDir = path.resolve(__dirname, '../public/uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 
-  // SPA fallback: All non-API GET requests serve index.html
+  // SPA fallback: All non-API, non-upload GET requests serve index.html
   app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api/') && req.path !== '/api') {
+    if (req.method === 'GET' && !req.path.startsWith('/api/') && req.path !== '/api' && !req.path.startsWith('/uploads/')) {
       return res.sendFile(path.join(distPath, 'index.html'));
     }
     if (req.path.startsWith('/api/') || req.path === '/api') {

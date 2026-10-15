@@ -1,8 +1,14 @@
 import express from 'express';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { db } from '../db/store.js';
 import { supabase } from '../db/supabase.js';
 import { verifyToken, requireRoles } from '../middleware/auth.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
@@ -243,10 +249,19 @@ router.get('/admin-bank-accounts', verifyToken, requireRoles(['admin']), async (
       });
 
       if (response.data && response.data.status === 'success' && Array.isArray(response.data.data) && response.data.data.length > 0) {
+        const normalized = response.data.data.map((item, idx) => ({
+          id: String(item.id || item._id || item.admin_bank_account_id || item.account_id || `usepay_bank_${idx + 1}`),
+          bank_name: item.bank_name || item.bank || 'Bank',
+          account_number: item.account_number || item.account_no || '',
+          ifsc_code: item.ifsc_code || item.ifsc || '',
+          account_holder_name: item.account_holder_name || item.holder_name || item.beneficiary_name || item.account_name || 'UsePay Admin',
+          upi_id: item.upi_id || item.upi || null,
+          branch: item.branch || ''
+        }));
         return res.status(200).json({
           success: true,
           status: 'success',
-          bank_accounts: response.data.data
+          bank_accounts: normalized
         });
       }
     } catch (err) {
@@ -316,16 +331,62 @@ router.post('/fund-request', verifyToken, requireRoles(['admin']), async (req, r
       wallet_type: cleanWallet
     };
 
-    if (admin_bank_account_id) {
-      payload.admin_bank_account_id = String(admin_bank_account_id).trim();
+    // Only pass admin_bank_account_id if valid non-empty string
+    if (admin_bank_account_id && typeof admin_bank_account_id === 'string') {
+      const cleanBankId = admin_bank_account_id.trim();
+      if (cleanBankId && cleanBankId !== 'undefined' && cleanBankId !== 'none' && cleanBankId !== 'null') {
+        payload.admin_bank_account_id = cleanBankId;
+      }
     }
-    if (proof_url) {
-      payload.proof_url = String(proof_url).trim();
+
+    // Process proof_url: Convert base64 data to public HTTP URL on disk if needed
+    let finalProofUrl = null;
+    if (proof_url && typeof proof_url === 'string') {
+      const trimmedProof = proof_url.trim();
+      if (trimmedProof.startsWith('http://') || trimmedProof.startsWith('https://')) {
+        finalProofUrl = trimmedProof;
+      } else if (trimmedProof.startsWith('data:image')) {
+        try {
+          const match = trimmedProof.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+            const base64Data = match[2];
+            const fileName = `fund_proof_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.${ext}`;
+
+            const uploadsDir = path.resolve(__dirname, '../../public/uploads/fund_proofs');
+            if (!fs.existsSync(uploadsDir)) {
+              fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+            fs.writeFileSync(path.join(uploadsDir, fileName), Buffer.from(base64Data, 'base64'));
+
+            const distUploads = path.resolve(__dirname, '../../dist/uploads/fund_proofs');
+            if (fs.existsSync(path.dirname(distUploads))) {
+              if (!fs.existsSync(distUploads)) fs.mkdirSync(distUploads, { recursive: true });
+              fs.writeFileSync(path.join(distUploads, fileName), Buffer.from(base64Data, 'base64'));
+            }
+
+            const host = req.get('host');
+            const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : req.protocol;
+            finalProofUrl = `${protocol}://${host}/uploads/fund_proofs/${fileName}`;
+          }
+        } catch (saveErr) {
+          console.warn('[Proof Image Save Warning]:', saveErr.message);
+        }
+      }
+    }
+
+    if (finalProofUrl) {
+      payload.proof_url = finalProofUrl;
     }
 
     let upstreamData = null;
     let generatedRequestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     let status = 'pending';
+
+    console.log('[UsePay Fund Request Outgoing Payload]:', JSON.stringify({
+      endpoint: `${baseUrl}/fund-request`,
+      payload
+    }, null, 2));
 
     // Submit to UsePay Upstream API
     if (apiKey && secretKey) {
@@ -336,7 +397,7 @@ router.post('/fund-request', verifyToken, requireRoles(['admin']), async (req, r
             'x-secret-key': secretKey,
             'Content-Type': 'application/json'
           },
-          timeout: 10000
+          timeout: 12000
         });
 
         if (upstreamRes.data) {
@@ -349,8 +410,26 @@ router.post('/fund-request', verifyToken, requireRoles(['admin']), async (req, r
           }
         }
       } catch (apiErr) {
-        console.error('[UsePay Fund Request Error]:', apiErr.response?.data || apiErr.message);
-        const errMsg = apiErr.response?.data?.message || 'Upstream provider rejected the fund request.';
+        console.error('[UsePay Fund Request Error Response]:', apiErr.response?.data || apiErr.message);
+        
+        let errMsg = 'Upstream provider rejected the fund request.';
+        const resData = apiErr.response?.data;
+        if (resData) {
+          if (typeof resData === 'string') {
+            errMsg = resData;
+          } else if (resData.message) {
+            errMsg = resData.message;
+          } else if (resData.error) {
+            errMsg = typeof resData.error === 'string' ? resData.error : (resData.error.message || JSON.stringify(resData.error));
+          } else if (resData.msg) {
+            errMsg = resData.msg;
+          } else if (Array.isArray(resData.errors) && resData.errors.length > 0) {
+            errMsg = resData.errors.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+          }
+        } else if (apiErr.message) {
+          errMsg = apiErr.message;
+        }
+
         return res.status(apiErr.response?.status || 400).json({
           success: false,
           status: 'error',

@@ -422,7 +422,7 @@ export const AdminFundRequestManagement: React.FC = () => {
                   <option value="">-- None / Direct UPI Transfer --</option>
                   {bankAccounts.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.bank_name} - {b.account_number} ({b.account_holder_name})
+                      {b.bank_name} - {b.account_number}{b.account_holder_name ? ` (${b.account_holder_name})` : ''}
                     </option>
                   ))}
                 </select>

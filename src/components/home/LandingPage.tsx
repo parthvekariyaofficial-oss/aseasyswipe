@@ -58,9 +58,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm transition">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
+
           {/* Logo */}
-          <div 
+          <div
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="flex items-center gap-3 cursor-pointer group"
           >
@@ -190,7 +190,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            
+
             {/* Left Column: Heading & CTAs */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
@@ -237,7 +237,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
 
             {/* Right Column: Visual Elements (App Phone Mockup + RuPay Card + 3D Shield) */}
             <div className="lg:col-span-5 relative flex items-center justify-center">
-              
+
               {/* Phone Mockup Card */}
               <div className="relative w-64 sm:w-72 bg-[#0d223f] border-4 border-slate-700/80 rounded-[38px] p-5 shadow-2xl shadow-black/60 text-white z-10 transform hover:scale-[1.02] transition duration-300">
                 {/* Phone Speaker Notch */}
@@ -331,7 +331,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <section id="services" className="py-20 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          
+
           <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600 block mb-2">
             OUR SERVICES
           </span>
@@ -342,7 +342,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
 
           {/* 5 Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-            
+
             {/* 1. AEPS */}
             <div className="bg-white rounded-3xl p-7 border border-slate-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition duration-300 flex flex-col items-center text-center group">
               <div className="w-16 h-16 rounded-full bg-[#0c2340] text-blue-400 flex items-center justify-center mb-5 group-hover:scale-110 transition shadow-lg shadow-slate-900/10">
@@ -352,7 +352,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-500 font-medium mb-6 flex-1">
                 Aadhaar Enabled Payment System
               </p>
-              <button 
+              <button
                 onClick={onNavigateToLogin}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group-hover:gap-2 transition-all"
               >
@@ -370,7 +370,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-500 font-medium mb-6 flex-1">
                 Domestic Money Transfer
               </p>
-              <button 
+              <button
                 onClick={onNavigateToLogin}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group-hover:gap-2 transition-all"
               >
@@ -388,7 +388,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-500 font-medium mb-6 flex-1">
                 Bharat Bill Payment System
               </p>
-              <button 
+              <button
                 onClick={onNavigateToLogin}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group-hover:gap-2 transition-all"
               >
@@ -406,7 +406,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-500 font-medium mb-6 flex-1">
                 Instant & Easy Loans
               </p>
-              <button 
+              <button
                 onClick={onNavigateToLogin}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group-hover:gap-2 transition-all"
               >
@@ -424,7 +424,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-500 font-medium mb-6 flex-1">
                 Secure Your Future with Insurance
               </p>
-              <button 
+              <button
                 onClick={onNavigateToLogin}
                 className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group-hover:gap-2 transition-all"
               >
@@ -442,7 +442,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <section id="why-choose-us" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <div className="text-center mb-14">
             <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600 block mb-2">
               WHY CHOOSE US
@@ -453,7 +453,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
+
             {/* Left: Big Glossy 3D Shield Check Illustration */}
             <div className="lg:col-span-5 flex items-center justify-center">
               <div className="relative w-64 h-72 sm:w-72 sm:h-80 bg-gradient-to-tr from-blue-700 via-blue-600 to-cyan-500 rounded-3xl shadow-2xl shadow-blue-500/30 flex items-center justify-center transform hover:scale-105 transition duration-500">
@@ -468,7 +468,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
 
             {/* Right: 2x2 Feature Grid */}
             <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-8">
-              
+
               {/* Feature 1 */}
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-full bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -533,9 +533,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <section id="features" className="py-20 bg-[#08172e] text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
+
             {/* Left: 4 Features with Green Line Icons */}
             <div className="lg:col-span-8 space-y-8">
               <div>
@@ -548,7 +548,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4">
-                
+
                 {/* 1 */}
                 <div className="space-y-2.5">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
@@ -624,7 +624,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <section id="contact" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <div className="text-center mb-14">
             <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600 block mb-2">
               CONTACT US
@@ -635,10 +635,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-            
+
             {/* Box 1: Contact Details List */}
             <div className="lg:col-span-4 bg-slate-50 border border-slate-200/80 rounded-3xl p-6 sm:p-8 space-y-6 flex flex-col justify-center">
-              
+
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
                   <Phone className="w-5 h-5" />
@@ -658,7 +658,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
                 <div>
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Email</p>
                   <a href="mailto:asupport@aseasyswipe.com" className="text-sm font-bold text-slate-900 hover:text-blue-600 transition break-all">
-                    asupport@aseasyswipe.com
+                    support@aseasyswipe.com
                   </a>
                 </div>
               </div>
@@ -728,9 +728,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
           ======================================================== */}
       <footer className="bg-[#050e1d] text-slate-300 pt-16 pb-8 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 pb-14 border-b border-slate-800/80">
-            
+
             {/* Col 1: Brand & About */}
             <div className="lg:col-span-4 space-y-4">
               <div className="flex items-center gap-2.5">
@@ -744,7 +744,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToLogin }) =
               <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
                 Your one-stop platform for banking, payments, loans and insurance — simple, fast and secure.
               </p>
-              
+
               {/* Social Icons */}
               <div className="flex items-center gap-3 pt-2">
                 <a href="#" className="w-8 h-8 rounded-full bg-slate-800 hover:bg-blue-600 flex items-center justify-center text-white transition text-xs font-bold">
