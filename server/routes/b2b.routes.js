@@ -1154,6 +1154,26 @@ export const extractCardLast4 = (item) => {
 };
 
 /**
+ * Sanitize BBPS Bill Payment payload to ensure only valid table columns are sent to Supabase
+ */
+const sanitizeBbpsDbPayload = (entry) => {
+  const allowed = [
+    'id', 'user_id', 'firm_name', 'card_last4', 'biller_id', 'biller_name',
+    'customer_name', 'customer_mobile', 'customer_pan', 'amount',
+    'payment_mode', 'client_transaction_id', 'fetch_request_id',
+    'api_transaction_id', 'bbps_txn_ref_id', 'status', 'status_message',
+    'customer_params', 'created_at', 'updated_at'
+  ];
+  const sanitized = {};
+  for (const k of allowed) {
+    if (entry[k] !== undefined) {
+      sanitized[k] = entry[k];
+    }
+  }
+  return sanitized;
+};
+
+/**
  * POST /api/b2b/pay-bill
  * Execute BBPS Bill Payment via UsePay B2B API with Slab Charge Deduction & Auto-Refund
  */
@@ -1270,7 +1290,13 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
 
   if (supabase) {
     try {
-      await supabase.from('bbps_bill_payments').upsert(newTxnEntry, { onConflict: 'client_transaction_id' });
+      const dbPayload = sanitizeBbpsDbPayload(newTxnEntry);
+      const { error: insertErr } = await supabase.from('bbps_bill_payments').upsert(dbPayload, { onConflict: 'client_transaction_id' });
+      if (insertErr) {
+        console.error('[BBPS DB Pre-Entry Error]:', insertErr);
+      } else {
+        console.log(`[BBPS DB Pre-Entry Success]: Successfully saved ${generatedClientTxnId} to bbps_bill_payments table.`);
+      }
     } catch (dbErr) {
       console.warn('[BBPS DB Pre-Entry Warning]:', dbErr.message);
     }
@@ -1375,15 +1401,22 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
 
     if (supabase) {
       try {
-        await supabase.from('bbps_bill_payments').update({
+        const updatePayload = {
           status: statusVal,
           api_transaction_id: apiTxnId,
           bbps_txn_ref_id: bbpsRefId,
           status_message: msg,
-          refunded: newTxnEntry.refunded || false,
-          refunded_amount: newTxnEntry.refunded_amount || 0,
           updated_at: new Date().toISOString()
-        }).eq('client_transaction_id', generatedClientTxnId);
+        };
+        const { error: updateErr } = await supabase
+          .from('bbps_bill_payments')
+          .update(updatePayload)
+          .eq('client_transaction_id', generatedClientTxnId);
+        if (updateErr) {
+          console.error('[BBPS DB Update Error]:', updateErr);
+        } else {
+          console.log(`[BBPS DB Update Success]: Transaction ${generatedClientTxnId} status updated to ${statusVal}`);
+        }
       } catch (e) {
         console.warn('[BBPS DB Update Warning]:', e.message);
       }
@@ -1409,13 +1442,18 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
 
     if (supabase) {
       try {
-        await supabase.from('bbps_bill_payments').update({
+        const failPayload = {
           status: 'failed',
           status_message: errMsg,
-          refunded: true,
-          refunded_amount: totalDeduction,
           updated_at: new Date().toISOString()
-        }).eq('client_transaction_id', generatedClientTxnId);
+        };
+        const { error: failErr } = await supabase
+          .from('bbps_bill_payments')
+          .update(failPayload)
+          .eq('client_transaction_id', generatedClientTxnId);
+        if (failErr) {
+          console.error('[BBPS DB Failure Update Error]:', failErr);
+        }
       } catch (e) {
         console.warn('[BBPS DB Failure Update Warning]:', e.message);
       }
