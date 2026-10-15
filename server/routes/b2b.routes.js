@@ -1160,6 +1160,7 @@ const sanitizeBbpsDbPayload = (entry) => {
   const allowed = [
     'id', 'user_id', 'firm_name', 'card_last4', 'biller_id', 'biller_name',
     'customer_name', 'customer_mobile', 'customer_pan', 'amount',
+    'service_charge', 'total_deducted', 'refunded', 'refunded_amount',
     'payment_mode', 'client_transaction_id', 'fetch_request_id',
     'api_transaction_id', 'bbps_txn_ref_id', 'status', 'status_message',
     'customer_params', 'created_at', 'updated_at'
@@ -1564,6 +1565,30 @@ router.get('/history', verifyToken, async (req, res) => {
       }
     });
 
+    // Fetch charge slabs once to enrich or fallback if any record has missing/zero service_charge
+    let chargeSlabs = [];
+    if (supabase) {
+      try {
+        const { data: slabData } = await supabase.from('bill_charge_slabs').select('*').order('min_amount', { ascending: true });
+        if (slabData && slabData.length > 0) chargeSlabs = slabData;
+      } catch (e) {}
+    }
+    if (chargeSlabs.length === 0) {
+      chargeSlabs = db.charge_slabs || [
+        { min_amount: 1, max_amount: 50000, charge_amount: 25 },
+        { min_amount: 50001, max_amount: 100000, charge_amount: 50 }
+      ];
+    }
+
+    const computeSlabCharge = (amt) => {
+      const numAmt = Number(amt || 0);
+      const match = chargeSlabs.find(s => numAmt >= Number(s.min_amount) && numAmt <= Number(s.max_amount));
+      if (match) return Number(match.charge_amount);
+      if (numAmt <= 50000) return 25;
+      if (numAmt <= 100000) return 50;
+      return 100;
+    };
+
     const enrichedHistory = historyData.map(item => {
       const u = userMap[item.user_id] || (db.users || []).find(usr => usr.id === item.user_id);
       const cardLast4 = item.card_last4 || extractCardLast4(item);
@@ -1571,12 +1596,18 @@ router.get('/history', verifyToken, async (req, res) => {
       const userName = item.user_name || u?.name || item.user_id;
       const userMobile = item.user_mobile || u?.mobile_number || '';
 
+      const rawCharge = item.service_charge !== undefined && item.service_charge !== null ? Number(item.service_charge) : 0;
+      const finalCharge = rawCharge > 0 ? rawCharge : computeSlabCharge(item.amount);
+      const finalTotalDeducted = Number(item.total_deducted || 0) > 0 ? Number(item.total_deducted) : (Number(item.amount || 0) + finalCharge);
+
       return {
         ...item,
         firm_name: firmName,
         card_last4: cardLast4,
         user_name: userName,
-        user_mobile: userMobile
+        user_mobile: userMobile,
+        service_charge: finalCharge,
+        total_deducted: finalTotalDeducted
       };
     });
 
@@ -1589,12 +1620,16 @@ router.get('/history', verifyToken, async (req, res) => {
     const fallbackList = (db.bill_payments || []).filter(p => req.user.role === 'admin' || p.user_id === req.user?.id);
     const enrichedFallback = fallbackList.map(item => {
       const u = (db.users || []).find(usr => usr.id === item.user_id);
+      const rawCharge = item.service_charge !== undefined && item.service_charge !== null ? Number(item.service_charge) : 0;
+      const finalCharge = rawCharge > 0 ? rawCharge : 25;
       return {
         ...item,
         firm_name: item.firm_name || u?.firm_name || 'Retailer Firm',
         card_last4: item.card_last4 || extractCardLast4(item),
         user_name: item.user_name || u?.name || item.user_id,
-        user_mobile: item.user_mobile || u?.mobile_number || ''
+        user_mobile: item.user_mobile || u?.mobile_number || '',
+        service_charge: finalCharge,
+        total_deducted: Number(item.amount || 0) + finalCharge
       };
     });
     return res.status(200).json({
