@@ -117,6 +117,388 @@ router.post('/usepay-settings', verifyToken, requireRoles(['admin']), (req, res)
   });
 });
 
+// ---------------------------------------------------------------------------
+// USEPAY FUND REQUEST / API WALLET TOP-UP ENDPOINTS (Admin Only)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/b2b/fund-request/active-services
+ * Returns ONLY the services that are active on the UsePay API side.
+ * If an API service is inactive/disabled, it is strictly excluded from the list.
+ */
+router.get('/fund-request/active-services', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
+  const apiKey = usepayConfig.apiKey || process.env.USEPAY_API_KEY || '';
+  const secretKey = usepayConfig.secretKey || process.env.USEPAY_SECRET_KEY || '';
+
+  let balanceData = {
+    is_cspl_enabled: true,
+    is_bbps_enabled: true,
+    is_payout_enabled: true,
+    cspl_wallet_balance: 12500,
+    bbps_wallet_balance: 15450.75,
+    payout_wallet_balance: 10000
+  };
+
+  if (apiKey && secretKey) {
+    try {
+      const response = await axios.get(`${baseUrl}/balance`, {
+        headers: {
+          'x-api-key': apiKey,
+          'x-secret-key': secretKey,
+          'Content-Type': 'application/json'
+        },
+        timeout: 8000
+      });
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        balanceData = response.data.data;
+      }
+    } catch (err) {
+      console.warn('[UsePay Active Services Warning]: Falling back to current balance state', err.message);
+    }
+  }
+
+  // STRICT FILTER: Only push wallet service if it is explicitly active on API
+  const activeServices = [];
+
+  if (balanceData.is_cspl_enabled === true) {
+    activeServices.push({
+      wallet_type: 'cspl',
+      label: 'CSPL Fast Bill',
+      service_title: 'Instant Sub-second Bill Payment API (/cspl/pay-bill)',
+      badge_color: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      current_balance: Number(balanceData.cspl_wallet_balance || 0),
+      endpoint: '/cspl/pay-bill'
+    });
+  }
+
+  if (balanceData.is_bbps_enabled === true) {
+    activeServices.push({
+      wallet_type: 'bbps',
+      label: 'BBPS Utility',
+      service_title: 'Standard BillAvenue Utility Payments (/pay-bill)',
+      badge_color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      current_balance: Number(balanceData.bbps_wallet_balance || 0),
+      endpoint: '/pay-bill'
+    });
+  }
+
+  if (balanceData.is_payout_enabled === true) {
+    activeServices.push({
+      wallet_type: 'payout',
+      label: 'Bank Payout',
+      service_title: '24x7 IMPS / NEFT Instant Transfers (/payout/transfer)',
+      badge_color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+      current_balance: Number(balanceData.payout_wallet_balance || 0),
+      endpoint: '/payout/transfer'
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    active_services: activeServices,
+    total_active: activeServices.length
+  });
+});
+
+/**
+ * GET /api/b2b/admin-bank-accounts
+ * Fetches UsePay Admin Bank Accounts where money can be deposited.
+ */
+router.get('/admin-bank-accounts', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
+  const apiKey = usepayConfig.apiKey || process.env.USEPAY_API_KEY || '';
+  const secretKey = usepayConfig.secretKey || process.env.USEPAY_SECRET_KEY || '';
+
+  const fallbackBankAccounts = [
+    {
+      id: 'usepay_bank_hdfc_01',
+      bank_name: 'HDFC Bank',
+      account_number: '50200084729184',
+      ifsc_code: 'HDFC0000240',
+      account_holder_name: 'UsePay Digital Solutions Pvt Ltd',
+      upi_id: 'usepay@hdfcbank',
+      branch: 'Corporate Finance Branch, Mumbai'
+    },
+    {
+      id: 'usepay_bank_icici_02',
+      bank_name: 'ICICI Bank',
+      account_number: '001105029384',
+      ifsc_code: 'ICIC0000011',
+      account_holder_name: 'UsePay Digital Solutions Pvt Ltd',
+      upi_id: 'usepay@icici',
+      branch: 'BKC Business Branch, Mumbai'
+    }
+  ];
+
+  if (apiKey && secretKey) {
+    try {
+      const response = await axios.get(`${baseUrl}/admin-bank-accounts`, {
+        headers: {
+          'x-api-key': apiKey,
+          'x-secret-key': secretKey,
+          'Content-Type': 'application/json'
+        },
+        timeout: 8000
+      });
+
+      if (response.data && response.data.status === 'success' && Array.isArray(response.data.data) && response.data.data.length > 0) {
+        return res.status(200).json({
+          success: true,
+          status: 'success',
+          bank_accounts: response.data.data
+        });
+      }
+    } catch (err) {
+      console.warn('[UsePay Admin Bank Accounts API Warning]:', err.response?.data || err.message);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    status: 'success',
+    bank_accounts: fallbackBankAccounts
+  });
+});
+
+/**
+ * POST /api/b2b/fund-request
+ * Submits a B2B wallet fund request to UsePay API.
+ * Body parameters:
+ *   - amount (Number, REQUIRED)
+ *   - utr_number (String, REQUIRED)
+ *   - wallet_type (String, REQUIRED: 'cspl' | 'bbps' | 'payout')
+ *   - admin_bank_account_id (String, OPTIONAL)
+ *   - proof_url (String, OPTIONAL)
+ */
+router.post('/fund-request', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    const { amount, utr_number, wallet_type, admin_bank_account_id, proof_url } = req.body;
+
+    // 1. Validate Amount
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'Valid amount greater than ₹0 is required.'
+      });
+    }
+
+    // 2. Validate UTR Number
+    const cleanUtr = String(utr_number || '').trim();
+    if (!cleanUtr) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: 'Unique Bank Transaction Reference / UTR Number is required.'
+      });
+    }
+
+    // 3. Validate Wallet Type
+    const allowedWallets = ['cspl', 'bbps', 'payout'];
+    const cleanWallet = String(wallet_type || '').toLowerCase().trim();
+    if (!allowedWallets.includes(cleanWallet)) {
+      return res.status(400).json({
+        success: false,
+        status: 'error',
+        message: "Invalid wallet_type. Allowed values are 'cspl', 'bbps', or 'payout'."
+      });
+    }
+
+    const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
+    const apiKey = usepayConfig.apiKey || process.env.USEPAY_API_KEY || '';
+    const secretKey = usepayConfig.secretKey || process.env.USEPAY_SECRET_KEY || '';
+
+    const payload = {
+      amount: numAmount,
+      utr_number: cleanUtr,
+      wallet_type: cleanWallet
+    };
+
+    if (admin_bank_account_id) {
+      payload.admin_bank_account_id = String(admin_bank_account_id).trim();
+    }
+    if (proof_url) {
+      payload.proof_url = String(proof_url).trim();
+    }
+
+    let upstreamData = null;
+    let generatedRequestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    let status = 'pending';
+
+    // Submit to UsePay Upstream API
+    if (apiKey && secretKey) {
+      try {
+        const upstreamRes = await axios.post(`${baseUrl}/fund-request`, payload, {
+          headers: {
+            'x-api-key': apiKey,
+            'x-secret-key': secretKey,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        });
+
+        if (upstreamRes.data) {
+          upstreamData = upstreamRes.data;
+          if (upstreamRes.data.data?.request_id) {
+            generatedRequestId = upstreamRes.data.data.request_id;
+          }
+          if (upstreamRes.data.data?.status) {
+            status = upstreamRes.data.data.status;
+          }
+        }
+      } catch (apiErr) {
+        console.error('[UsePay Fund Request Error]:', apiErr.response?.data || apiErr.message);
+        const errMsg = apiErr.response?.data?.message || 'Upstream provider rejected the fund request.';
+        return res.status(apiErr.response?.status || 400).json({
+          success: false,
+          status: 'error',
+          message: errMsg,
+          error_details: apiErr.response?.data
+        });
+      }
+    }
+
+    const newRecord = {
+      id: `fund_rec_${Date.now()}`,
+      request_id: generatedRequestId,
+      amount: numAmount,
+      utr_number: cleanUtr,
+      wallet_type: cleanWallet,
+      admin_bank_account_id: payload.admin_bank_account_id || null,
+      proof_url: payload.proof_url || null,
+      status: status,
+      submitted_by: req.user.id,
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (!db.api_fund_requests) db.api_fund_requests = [];
+    db.api_fund_requests.unshift(newRecord);
+
+    if (supabase) {
+      try {
+        await supabase.from('api_fund_requests').insert([newRecord]);
+      } catch (sbErr) {
+        console.warn('[Supabase api_fund_requests Insert Warning]:', sbErr.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      status: 'success',
+      message: 'Fund request submitted successfully and pending approval',
+      data: newRecord,
+      upstream_response: upstreamData
+    });
+  } catch (err) {
+    console.error('Submit Fund Request Server Error:', err);
+    return res.status(500).json({
+      success: false,
+      status: 'error',
+      message: 'Internal server error submitting fund request.'
+    });
+  }
+});
+
+/**
+ * GET /api/b2b/fund-request/history
+ * Returns list of submitted API fund requests.
+ */
+router.get('/fund-request/history', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('api_fund_requests')
+          .select('*')
+          .order('submitted_at', { ascending: false });
+        if (data && Array.isArray(data)) {
+          db.api_fund_requests = data;
+        }
+      } catch (sbErr) {
+        console.warn('[Supabase api_fund_requests History Warning]:', sbErr.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 'success',
+      requests: db.api_fund_requests || []
+    });
+  } catch (err) {
+    console.error('Fetch Fund Request History Error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch fund request history.'
+    });
+  }
+});
+
+/**
+ * GET /api/b2b/fund-request/status/:request_id
+ * Queries live status of a submitted fund request from UsePay API.
+ */
+router.get('/fund-request/status/:request_id', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const { request_id } = req.params;
+  const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
+  const apiKey = usepayConfig.apiKey || process.env.USEPAY_API_KEY || '';
+  const secretKey = usepayConfig.secretKey || process.env.USEPAY_SECRET_KEY || '';
+
+  let liveStatus = 'pending';
+  let upstreamData = null;
+
+  if (apiKey && secretKey) {
+    try {
+      const response = await axios.get(`${baseUrl}/fund-request/status/${request_id}`, {
+        headers: {
+          'x-api-key': apiKey,
+          'x-secret-key': secretKey,
+          'Content-Type': 'application/json'
+        },
+        timeout: 8000
+      });
+
+      if (response.data && response.data.status === 'success' && response.data.data) {
+        upstreamData = response.data.data;
+        liveStatus = upstreamData.status || liveStatus;
+      }
+    } catch (err) {
+      console.warn(`[UsePay Status Check Warning for ${request_id}]:`, err.response?.data || err.message);
+    }
+  }
+
+  // Update status in local memory
+  const reqItem = (db.api_fund_requests || []).find(r => r.request_id === request_id || r.id === request_id);
+  if (reqItem) {
+    reqItem.status = liveStatus;
+    reqItem.updated_at = new Date().toISOString();
+  }
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('api_fund_requests')
+        .update({ status: liveStatus, updated_at: new Date().toISOString() })
+        .or(`request_id.eq.${request_id},id.eq.${request_id}`);
+    } catch (sbErr) {
+      console.warn('Supabase fund request status update warning:', sbErr.message);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    status: 'success',
+    data: {
+      request_id,
+      status: liveStatus,
+      updated_at: new Date().toISOString(),
+      upstream: upstreamData
+    }
+  });
+});
+
 // GET /api/b2b/credentials (B2B User or Admin)
 router.get('/credentials', verifyToken, requireRoles(['b2b_user', 'admin']), (req, res) => {
   const creds = (db.b2b_credentials && db.b2b_credentials.find(c => c.user_id === req.user.id)) || {

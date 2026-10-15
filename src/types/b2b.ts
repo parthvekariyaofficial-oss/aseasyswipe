@@ -111,3 +111,68 @@ export interface PayBillResponse {
     payment_status?: string;
   };
 }
+
+// ============================================================================
+// API WALLET FUND REQUEST TYPES
+// ============================================================================
+
+export type ApiWalletType = 'cspl' | 'bbps' | 'payout';
+
+export interface UsePayActiveServiceItem {
+  wallet_type: ApiWalletType;
+  label: string;
+  service_title: string;
+  badge_color: string;
+  current_balance: number;
+  endpoint: string;
+}
+
+export interface UsePayAdminBankAccount {
+  id: string;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  account_holder_name: string;
+  upi_id?: string;
+  branch?: string;
+  qr_code_url?: string;
+}
+
+export interface ApiFundRequestPayload {
+  amount: number;
+  utr_number: string;
+  wallet_type: ApiWalletType;
+  admin_bank_account_id?: string;
+  proof_url?: string;
+}
+
+export interface ApiFundRequestRecord {
+  id: string;
+  request_id: string;
+  amount: number;
+  utr_number: string;
+  wallet_type: ApiWalletType;
+  admin_bank_account_id?: string | null;
+  proof_url?: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  submitted_by?: string;
+  submitted_at: string;
+  updated_at?: string;
+}
+
+export interface FundRequestHistoryResponse {
+  success: boolean;
+  status: string;
+  requests: ApiFundRequestRecord[];
+}
+
+export interface FundRequestStatusResponse {
+  success: boolean;
+  status: string;
+  data: {
+    request_id: string;
+    status: 'pending' | 'approved' | 'rejected' | string;
+    updated_at: string;
+    upstream?: any;
+  };
+}

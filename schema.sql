@@ -480,5 +480,26 @@ CREATE INDEX IF NOT EXISTS idx_kyc_user_id ON public.kyc_verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_kyc_status ON public.kyc_verifications(status);
 ALTER TABLE IF EXISTS public.kyc_verifications DISABLE ROW LEVEL SECURITY;
 
+-- =============================================================================
+-- 14. API FUND REQUESTS TABLE (B2B Agent / UsePay Wallet Top-Up Requests)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.api_fund_requests (
+    id TEXT PRIMARY KEY,
+    request_id TEXT,
+    amount NUMERIC(15,2) NOT NULL CHECK (amount > 0),
+    utr_number VARCHAR(100) NOT NULL,
+    wallet_type VARCHAR(20) NOT NULL CHECK (wallet_type IN ('cspl', 'bbps', 'payout')),
+    admin_bank_account_id TEXT,
+    proof_url TEXT,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    submitted_by TEXT,
+    submitted_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fund_req_status ON public.api_fund_requests(status);
+CREATE INDEX IF NOT EXISTS idx_fund_req_wallet ON public.api_fund_requests(wallet_type);
+ALTER TABLE IF EXISTS public.api_fund_requests DISABLE ROW LEVEL SECURITY;
+
 
 

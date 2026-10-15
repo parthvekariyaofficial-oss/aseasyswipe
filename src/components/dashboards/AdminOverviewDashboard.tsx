@@ -4,12 +4,13 @@ import type { QrPaymentRequest } from '../../types/qr';
 import type { UserProfile } from '../../types/auth';
 import type { CreditCardBillRequest } from '../../types/billRequest';
 import type { PayoutTransaction } from '../../types/payout';
-import type { UsePayBalanceData } from '../../types/b2b';
+import type { UsePayBalanceData, ApiWalletType } from '../../types/b2b';
+import { ApiWalletFundRequestModal } from '../b2b/ApiWalletFundRequestModal';
 import { 
   CheckCircle2, ShieldCheck, Users, Building2, Wallet, 
   ArrowUpRight, Clock, RefreshCw, Coins, Award, Zap, CreditCard, Receipt,
   ArrowRightLeft, IndianRupee, Calendar, RotateCcw, Filter, CircleDollarSign,
-  AlertCircle
+  AlertCircle, Server
 } from 'lucide-react';
 
 export const AdminOverviewDashboard: React.FC = () => {
@@ -22,6 +23,10 @@ export const AdminOverviewDashboard: React.FC = () => {
   const [usepayLoading, setUsepayLoading] = useState(false);
   const [usepayError, setUsepayError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // API Fund Request Modal State
+  const [showFundRequestModal, setShowFundRequestModal] = useState<boolean>(false);
+  const [fundRequestDefaultWallet, setFundRequestDefaultWallet] = useState<ApiWalletType>('bbps');
 
   // Date Filter State (Default: TODAY)
   const [dateFilter, setDateFilter] = useState<'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'ALL' | 'CUSTOM'>('TODAY');
@@ -301,6 +306,27 @@ export const AdminOverviewDashboard: React.FC = () => {
 
       {/* 5 OPERATIONAL WALLET & SYSTEM STATUS CARDS IN ONE ROW */}
       <div className="space-y-3">
+        {/* Top Header Bar for Upstream API Wallets */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase text-indigo-400 tracking-wider flex items-center gap-1.5">
+              <Server className="w-4 h-4" /> B2B Upstream API Wallets & Platform Status
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFundRequestDefaultWallet('bbps');
+              setShowFundRequestModal(true);
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-md shadow-indigo-950/60 transition self-start sm:self-auto cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span>Top-Up API Wallet (Fund Request)</span>
+          </button>
+        </div>
+
         {/* UsePay Notice / Warning Alert if applicable */}
         {usepayError && (
           <div className="bg-amber-950/40 border border-amber-500/30 rounded-2xl p-3 flex items-start gap-2.5">
@@ -337,9 +363,16 @@ export const AdminOverviewDashboard: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-indigo-500/20 font-medium">
-              <span className="flex items-center gap-1 text-indigo-300 text-[10px] sm:text-[11px]">
-                <ArrowRightLeft className="w-3.5 h-3.5" /> 24x7 Payouts
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFundRequestDefaultWallet('payout');
+                  setShowFundRequestModal(true);
+                }}
+                className="flex items-center gap-1 text-indigo-300 hover:text-indigo-200 text-[10px] sm:text-[11px] font-bold"
+              >
+                <Zap className="w-3 h-3 text-amber-400" /> + Top-Up Payout
+              </button>
               <button 
                 onClick={fetchUsepayBalanceOnly}
                 title="Sync Balance"
@@ -373,9 +406,18 @@ export const AdminOverviewDashboard: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-emerald-500/20 font-medium">
-              <span className="text-[10px] sm:text-[11px]">Usable:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFundRequestDefaultWallet('bbps');
+                  setShowFundRequestModal(true);
+                }}
+                className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-[10px] sm:text-[11px] font-bold"
+              >
+                <Zap className="w-3 h-3 text-amber-400" /> + Top-Up BBPS
+              </button>
               <span className="font-mono text-emerald-400 font-bold text-[10px] sm:text-[11px]">
-                ₹{Number(usepayData?.usable_bbps_balance || usepayData?.bbps_wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Usable: ₹{Number(usepayData?.usable_bbps_balance || usepayData?.bbps_wallet_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -656,7 +698,16 @@ export const AdminOverviewDashboard: React.FC = () => {
 
       </div>
 
-
+      {/* API WALLET FUND REQUEST MODAL */}
+      <ApiWalletFundRequestModal
+        isOpen={showFundRequestModal}
+        onClose={() => setShowFundRequestModal(false)}
+        onSuccess={() => {
+          fetchUsepayBalanceOnly();
+          fetchData(false);
+        }}
+        defaultWalletType={fundRequestDefaultWallet}
+      />
 
     </div>
   );

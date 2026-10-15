@@ -22,6 +22,7 @@ import { AdminBillRequestsManagement } from './components/bills/AdminBillRequest
 import { LiveBillPayment } from './components/bills/LiveBillPayment';
 import { AdminLiveBillPayHistory } from './components/bills/AdminLiveBillPayHistory';
 import { AdminPayoutManagement } from './components/payout/AdminPayoutManagement';
+import { AdminFundRequestManagement } from './components/b2b/AdminFundRequestManagement';
 import { UserPayoutTransfer } from './components/payout/UserPayoutTransfer';
 import { UserAccountStatement } from './components/statement/UserAccountStatement';
 import { AdminMasterStatement } from './components/statement/AdminMasterStatement';
@@ -43,6 +44,9 @@ export default function App() {
     if (p.includes('admin-statement') || p.includes('admin_statement')) return 'admin_statement';
     if (p.includes('statement') || p.includes('passbook')) return role === 'admin' ? 'admin_statement' : 'user_statement';
     if (p.includes('admin-payout') || p.includes('admin_payout')) return 'admin_payout';
+    if (p.includes('api-fund-request') || p.includes('fund-request') || p.includes('fund_request')) {
+      return role === 'admin' ? 'api_fund_request' : 'dashboard';
+    }
     if (p.includes('payout')) {
       if (role === 'admin') return 'admin_payout';
       return instantPayoutEnabled ? 'payout_transfer' : 'users';
@@ -88,6 +92,7 @@ export default function App() {
     if (tab === 'change_password') return '/change-password';
     if (tab === 'admin_kyc') return '/admin-kyc';
     if (tab === 'admin_payout') return '/admin-payout';
+    if (tab === 'api_fund_request') return '/api-fund-request';
     if (tab === 'payout_transfer') return '/payout';
     if (tab === 'admin_statement') return '/admin-statement';
     if (tab === 'user_statement') return '/statement';
@@ -491,6 +496,11 @@ export default function App() {
           {activeTab === 'admin_payout' && (
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminPayoutManagement />
+            </ProtectedRoute>
+          )}
+          {activeTab === 'api_fund_request' && (
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminFundRequestManagement />
             </ProtectedRoute>
           )}
           {activeTab === 'admin_statement' && (

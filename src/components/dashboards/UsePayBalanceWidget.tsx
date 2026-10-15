@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { b2bApi } from '../../services/api';
 import type { UsePayBalanceData } from '../../types/b2b';
-import { RefreshCw, AlertCircle, Server } from 'lucide-react';
+import { ApiWalletFundRequestModal } from '../b2b/ApiWalletFundRequestModal';
+import { RefreshCw, AlertCircle, Server, Zap } from 'lucide-react';
 
 export const UsePayBalanceWidget: React.FC = () => {
   const [balanceData, setBalanceData] = useState<UsePayBalanceData | null>(null);
@@ -9,6 +10,7 @@ export const UsePayBalanceWidget: React.FC = () => {
   const [configured, setConfigured] = useState<boolean>(true);
   const [isMock, setIsMock] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showFundModal, setShowFundModal] = useState<boolean>(false);
 
   const fetchBalance = async () => {
     setLoading(true);
@@ -66,6 +68,15 @@ export const UsePayBalanceWidget: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFundModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg flex items-center gap-1.5 transition"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span>Top-Up Wallet</span>
+          </button>
+
           <button
             onClick={fetchBalance}
             disabled={loading}
@@ -135,6 +146,13 @@ export const UsePayBalanceWidget: React.FC = () => {
         </div>
 
       </div>
+
+      {/* FUND REQUEST MODAL */}
+      <ApiWalletFundRequestModal
+        isOpen={showFundModal}
+        onClose={() => setShowFundModal(false)}
+        onSuccess={fetchBalance}
+      />
 
     </div>
   );

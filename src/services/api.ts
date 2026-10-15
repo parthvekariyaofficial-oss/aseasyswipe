@@ -1,5 +1,12 @@
 import axios from 'axios';
 import type { AuthResponse, UserProfile } from '../types/auth';
+import type { 
+  UsePayActiveServiceItem, 
+  UsePayAdminBankAccount, 
+  ApiFundRequestPayload, 
+  ApiFundRequestRecord, 
+  FundRequestStatusResponse 
+} from '../types/b2b';
 export { supabase } from '../lib/supabase';
 
 const API_BASE_URL = '/api';
@@ -393,6 +400,32 @@ export const b2bApi = {
 
   updateSettings: async (data: { live_bill_pay_enabled: boolean }) => {
     const response = await apiClient.post('/b2b/settings', data);
+    return response.data;
+  },
+
+  // USEPAY FUND REQUEST / TOP-UP APIS
+  getFundRequestActiveServices: async (): Promise<{ success: boolean; active_services: UsePayActiveServiceItem[]; total_active: number }> => {
+    const response = await apiClient.get('/b2b/fund-request/active-services');
+    return response.data;
+  },
+
+  getAdminBankAccounts: async (): Promise<{ success: boolean; status: string; bank_accounts: UsePayAdminBankAccount[] }> => {
+    const response = await apiClient.get('/b2b/admin-bank-accounts');
+    return response.data;
+  },
+
+  submitFundRequest: async (payload: ApiFundRequestPayload): Promise<{ success: boolean; status: string; message: string; data?: ApiFundRequestRecord }> => {
+    const response = await apiClient.post('/b2b/fund-request', payload);
+    return response.data;
+  },
+
+  getFundRequestHistory: async (): Promise<{ success: boolean; status: string; requests: ApiFundRequestRecord[] }> => {
+    const response = await apiClient.get('/b2b/fund-request/history');
+    return response.data;
+  },
+
+  checkFundRequestStatus: async (requestId: string): Promise<FundRequestStatusResponse> => {
+    const response = await apiClient.get(`/b2b/fund-request/status/${encodeURIComponent(requestId)}`);
     return response.data;
   }
 };

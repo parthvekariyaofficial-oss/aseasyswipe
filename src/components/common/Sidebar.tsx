@@ -130,6 +130,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badgeColor: 'bg-cyan-500 text-slate-950 shadow-cyan-500/30'
         },
         {
+          id: 'api_fund_request',
+          label: 'API Wallet Top-Up',
+          icon: Zap
+        },
+        {
           id: 'admin_statement',
           label: 'Account Passbook',
           icon: FileText
