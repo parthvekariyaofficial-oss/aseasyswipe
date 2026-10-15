@@ -38,6 +38,11 @@ ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAU
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS mpin_set BOOLEAN DEFAULT false;
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS kyc_status TEXT CHECK (kyc_status IN ('not_submitted', 'under_review', 'verified', 'rejected')) DEFAULT 'not_submitted';
 ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT;
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS home_address TEXT DEFAULT '';
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS firm_address TEXT DEFAULT '';
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS middle_name TEXT;
+ALTER TABLE public.users_profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
 
 
 -- 1B. ADMIN PROFILES TABLE (Separate Dedicated Admin Accounts SQL Table - No TPIN)
@@ -63,6 +68,11 @@ ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS plain_password TEXT D
 ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false;
 ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS mpin VARCHAR(6) DEFAULT '123456';
 ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS profile_photo_url TEXT;
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS home_address TEXT DEFAULT '';
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS firm_address TEXT DEFAULT '';
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS middle_name TEXT;
+ALTER TABLE public.admin_profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
 ALTER TABLE IF EXISTS public.admin_profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.users_profiles ALTER COLUMN qr_charge_percent SET DEFAULT 0.00;
 

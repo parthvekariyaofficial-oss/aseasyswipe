@@ -18,7 +18,22 @@ if (supabase) {
           if (!combined.some(u => u.id === adm.id)) combined.push(adm);
         });
       }
-      db.users = combined;
+      const existingMap = new Map((db.users || []).map(u => [u.id, u]));
+      db.users = combined.map(dbU => {
+        const memU = existingMap.get(dbU.id);
+        return {
+          ...dbU,
+          home_address: dbU.home_address !== undefined && dbU.home_address !== null && dbU.home_address !== ''
+            ? dbU.home_address
+            : (memU?.home_address || ''),
+          firm_address: dbU.firm_address !== undefined && dbU.firm_address !== null && dbU.firm_address !== ''
+            ? dbU.firm_address
+            : (memU?.firm_address || ''),
+          first_name: dbU.first_name || memU?.first_name || '',
+          middle_name: dbU.middle_name || memU?.middle_name || '',
+          last_name: dbU.last_name || memU?.last_name || ''
+        };
+      });
     } catch (e) {
       console.error('Supabase user sync warning:', e);
     }
@@ -132,7 +147,22 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
       try {
         const { data, error } = await supabase.from('users_profiles').select('*');
         if (!error && Array.isArray(data)) {
-          db.users = data;
+          const existingMap = new Map((db.users || []).map(u => [u.id, u]));
+          db.users = data.map(dbU => {
+            const memU = existingMap.get(dbU.id);
+            return {
+              ...dbU,
+              home_address: dbU.home_address !== undefined && dbU.home_address !== null && dbU.home_address !== ''
+                ? dbU.home_address
+                : (memU?.home_address || ''),
+              firm_address: dbU.firm_address !== undefined && dbU.firm_address !== null && dbU.firm_address !== ''
+                ? dbU.firm_address
+                : (memU?.firm_address || ''),
+              first_name: dbU.first_name || memU?.first_name || '',
+              middle_name: dbU.middle_name || memU?.middle_name || '',
+              last_name: dbU.last_name || memU?.last_name || ''
+            };
+          });
         }
       } catch (err) {
         console.error('Supabase hierarchy fetch error:', err);
@@ -355,7 +385,12 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
     const newUser = {
       id: newId,
       name: fullName,
+      first_name: firstName || '',
+      middle_name: middleName || '',
+      last_name: lastName || '',
       firm_name: userFirm,
+      home_address: (home_address || '').trim(),
+      firm_address: (firm_address || '').trim(),
       email: email || `${mobile_number}@aseasyswipe.com`,
       mobile_number,
       password: defaultPasswordHash,
@@ -397,7 +432,17 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
           delete payload.kyc_rejection_reason;
           delete payload.mpin_set;
         }
-        const { error: sbErr } = await supabase.from(targetTable).insert([payload]);
+        let { error: sbErr } = await supabase.from(targetTable).insert([payload]);
+        if (sbErr && (sbErr.message?.includes('home_address') || sbErr.message?.includes('firm_address') || sbErr.message?.includes('first_name') || sbErr.message?.includes('middle_name') || sbErr.message?.includes('last_name'))) {
+          const safePayload = { ...payload };
+          delete safePayload.home_address;
+          delete safePayload.firm_address;
+          delete safePayload.first_name;
+          delete safePayload.middle_name;
+          delete safePayload.last_name;
+          const retryRes = await supabase.from(targetTable).insert([safePayload]);
+          sbErr = retryRes.error;
+        }
         if (sbErr) {
           console.error('Supabase Insert User Error:', sbErr);
           db.users = db.users.filter(u => u.id !== newId);
@@ -525,8 +570,8 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
     if (role) targetUser.role = role;
     if (email !== undefined) targetUser.email = email;
     if (status) targetUser.status = status;
-    if (home_address !== undefined) targetUser.home_address = home_address;
-    if (firm_address !== undefined) targetUser.firm_address = firm_address;
+    if (home_address !== undefined) targetUser.home_address = (home_address || '').trim();
+    if (firm_address !== undefined) targetUser.firm_address = (firm_address || '').trim();
     if (profile_photo_url !== undefined) targetUser.profile_photo_url = profile_photo_url;
     if (target_distributor_id !== undefined) targetUser.distributor_id = target_distributor_id || null;
 
@@ -560,7 +605,16 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
           delete payload.distributor_id;
           delete payload.super_distributor_id;
         }
-        await supabase.from(targetTable).update(payload).eq('id', userId);
+        let { error: sbErr } = await supabase.from(targetTable).update(payload).eq('id', userId);
+        if (sbErr && (sbErr.message?.includes('home_address') || sbErr.message?.includes('firm_address') || sbErr.message?.includes('first_name') || sbErr.message?.includes('middle_name') || sbErr.message?.includes('last_name'))) {
+          const safePayload = { ...payload };
+          delete safePayload.home_address;
+          delete safePayload.firm_address;
+          delete safePayload.first_name;
+          delete safePayload.middle_name;
+          delete safePayload.last_name;
+          await supabase.from(targetTable).update(safePayload).eq('id', userId);
+        }
       } catch (sbErr) {
         console.error('Supabase Update User Error:', sbErr);
       }

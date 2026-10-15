@@ -89,9 +89,11 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
         setLastName(userToEdit.last_name || (parts.length > 1 ? parts[parts.length - 1] : ''));
         setEmail(userToEdit.email || '');
         setMobileNumber(userToEdit.mobile_number || '');
-        setHomeAddress(userToEdit.home_address || '');
+        const hAddr = userToEdit.home_address || (userToEdit as any).address || '';
+        const fAddr = userToEdit.firm_address || (userToEdit as any).business_address || '';
+        setHomeAddress(hAddr);
         setFirmName(userToEdit.firm_name || '');
-        setFirmAddress(userToEdit.firm_address || '');
+        setFirmAddress(fAddr);
         setRole(userToEdit.role || targetDefaultRole);
         setAssignedDistributorId(userToEdit.distributor_id || '');
         const chargeVal = userToEdit.qr_charge_percent !== undefined && userToEdit.qr_charge_percent !== null
@@ -523,7 +525,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                   </label>
                   <textarea
                     rows={3}
-                    required
+                    required={!userToEdit}
                     placeholder="ENTER COMPLETE HOME ADDRESS"
                     value={homeAddress}
                     onChange={(e) => setHomeAddress(e.target.value)}
@@ -558,7 +560,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
                   </label>
                   <textarea
                     rows={3}
-                    required
+                    required={!userToEdit}
                     placeholder="ENTER FIRM ADDRESS"
                     value={firmAddress}
                     onChange={(e) => setFirmAddress(e.target.value)}
