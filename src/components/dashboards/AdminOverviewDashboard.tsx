@@ -201,7 +201,12 @@ export const AdminOverviewDashboard: React.FC = () => {
 
   // 5. CC Bill Service Charges Breakdown (Offline + Live BBPS)
   const offlineBillServiceCharge = approvedBillRequests.reduce((acc, r) => acc + Number(r.service_charge || 0), 0);
-  const liveBillServiceCharge = successfulLivePayments.reduce((acc, r) => acc + Number(r.service_charge || r.charge_amount || r.charge || 0), 0);
+  const liveBillServiceCharge = successfulLivePayments.reduce((acc, r) => {
+    const raw = Number(r.service_charge ?? r.charge_amount ?? r.charge ?? 0);
+    if (raw > 0) return acc + raw;
+    const amt = Number(r.amount || 0);
+    return acc + (amt <= 50000 ? 25 : (amt <= 100000 ? 50 : 75));
+  }, 0);
   const totalBillServiceCharge = offlineBillServiceCharge + liveBillServiceCharge;
 
   // 6. CC Bill Volume Breakdown (Offline + Live BBPS)

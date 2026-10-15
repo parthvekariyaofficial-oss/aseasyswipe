@@ -122,7 +122,10 @@ export const RetailerDashboard: React.FC = () => {
   const successfulLivePayments = filteredLiveHistory.filter(r => r.status === 'success' || r.status === 'approved');
   const totalLiveBillVolume = successfulLivePayments.reduce((acc, r) => acc + Number(r.amount || 0), 0);
   const totalLiveBillCharges = successfulLivePayments.reduce((acc, r) => {
-    return acc + Number(r.service_charge || r.charge_amount || r.charge || 0);
+    const raw = Number(r.service_charge ?? r.charge_amount ?? r.charge ?? 0);
+    if (raw > 0) return acc + raw;
+    const amt = Number(r.amount || 0);
+    return acc + (amt <= 50000 ? 25 : (amt <= 100000 ? 50 : 75));
   }, 0);
 
   // 7 & 8: Instant Payout (Volume & Charges)

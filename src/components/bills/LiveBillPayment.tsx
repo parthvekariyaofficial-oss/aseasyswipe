@@ -105,6 +105,19 @@ const getCardLast4 = (item: any): string => {
   return '';
 };
 
+/**
+ * Safely compute service charge according to official charge slabs
+ */
+const getServiceCharge = (item: any): number => {
+  const charge = Number(item?.service_charge ?? item?.charge_amount ?? item?.charge ?? 0);
+  if (charge > 0) return charge;
+  const amt = Number(item?.amount || 0);
+  if (amt <= 50000) return 25;
+  if (amt <= 100000) return 50;
+  if (amt <= 150000) return 75;
+  return 100;
+};
+
 export const LiveBillPayment: React.FC = () => {
   const { user } = useAuthStore();
   const { liveBillPayEnabled } = useSettingsStore();
@@ -1030,7 +1043,7 @@ export const LiveBillPayment: React.FC = () => {
                       ₹{Number(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="p-3.5 font-bold text-pink-400 text-xs font-mono">
-                      +₹{Number(item.service_charge || item.charge_amount || item.charge || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      +₹{getServiceCharge(item).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="p-3.5 font-sans">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">

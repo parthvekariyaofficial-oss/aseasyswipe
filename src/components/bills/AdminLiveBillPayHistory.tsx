@@ -99,6 +99,19 @@ const getCardLast4 = (item: any): string => {
   return '';
 };
 
+/**
+ * Safely compute service charge according to official charge slabs
+ */
+export const getServiceCharge = (item: any): number => {
+  const charge = Number(item?.service_charge ?? item?.charge_amount ?? item?.charge ?? 0);
+  if (charge > 0) return charge;
+  const amt = Number(item?.amount || 0);
+  if (amt <= 50000) return 25;
+  if (amt <= 100000) return 50;
+  if (amt <= 150000) return 75;
+  return 100;
+};
+
 export const AdminLiveBillPayHistory: React.FC = () => {
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -619,7 +632,7 @@ export const AdminLiveBillPayHistory: React.FC = () => {
                         ₹{Number(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="p-3.5 font-bold text-pink-400 text-xs font-mono">
-                        +₹{Number(item.service_charge || item.charge_amount || item.charge || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        +₹{getServiceCharge(item).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="p-3.5 font-sans">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
@@ -781,6 +794,16 @@ export const AdminLiveBillPayHistory: React.FC = () => {
                     <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
                       <span className="text-slate-400 font-sans">Amount:</span>
                       <span className="font-black text-emerald-400 text-sm">₹{Number(statusModal.item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                      <span className="text-slate-400 font-sans">Service Charge (Slab):</span>
+                      <span className="font-bold text-pink-400 font-mono">+₹{getServiceCharge(statusModal.item).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
+                      <span className="text-slate-400 font-sans">Total Deducted:</span>
+                      <span className="font-black text-white font-mono">₹{(Number(statusModal.item.amount || 0) + getServiceCharge(statusModal.item)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
 
                     <div className="flex justify-between items-center border-b border-slate-800/60 pb-2">
