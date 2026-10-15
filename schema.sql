@@ -113,6 +113,9 @@ CREATE TABLE IF NOT EXISTS public.qr_payment_requests (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE public.qr_payment_requests ADD COLUMN IF NOT EXISTS admin_commission NUMERIC(15,2) DEFAULT 0.00;
+ALTER TABLE IF EXISTS public.qr_payment_requests ALTER COLUMN charge_percent SET DEFAULT 0.00;
+
 -- 4. SYSTEM SETTINGS TABLE (System Controls & User Panel Toggles)
 CREATE TABLE IF NOT EXISTS public.system_settings (
     id TEXT PRIMARY KEY DEFAULT 'qr_controls',

@@ -1115,11 +1115,12 @@ router.post('/request/:id/process', verifyToken, requireRoles(['admin']), async 
       try {
         await supabase.from('qr_payment_requests').update({
           status: 'approved',
-          charge_percent: targetReq.charge_percent,
-          charge_amount: targetReq.charge_amount,
+          charge_percent: targetReq.charge_percent !== undefined ? targetReq.charge_percent : 0,
+          charge_amount: targetReq.charge_amount !== undefined ? targetReq.charge_amount : 0,
           net_amount: targetReq.net_amount,
           distributor_commission: targetReq.distributor_commission || 0,
           super_distributor_commission: targetReq.super_distributor_commission || 0,
+          admin_commission: targetReq.admin_commission !== undefined ? targetReq.admin_commission : 0,
           processed_at: targetReq.processed_at,
           processed_by: targetReq.processed_by
         }).eq('id', reqId);

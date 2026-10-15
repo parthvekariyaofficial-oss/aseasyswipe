@@ -170,10 +170,20 @@ export const AdminOverviewDashboard: React.FC = () => {
 
   // 2. Total Admin QR Charge Commission
   const totalAdminCommission = approvedRequests.reduce((acc, r) => {
-    const chargeAmt = r.charge_amount || (Number(r.amount) * (Number(r.charge_percent || 0.5) / 100));
+    const rawChargeAmt = r.charge_amount !== undefined && r.charge_amount !== null
+      ? Number(r.charge_amount)
+      : null;
+    const rawChargePct = r.charge_percent !== undefined && r.charge_percent !== null
+      ? Number(r.charge_percent)
+      : null;
+
+    const chargeAmt = rawChargeAmt !== null
+      ? rawChargeAmt
+      : (rawChargePct !== null ? (Number(r.amount) * (rawChargePct / 100)) : 0);
+
     const dsComm = Number(r.distributor_commission || 0);
     const msComm = Number(r.super_distributor_commission || 0);
-    const adminComm = r.admin_commission !== undefined 
+    const adminComm = r.admin_commission !== undefined && r.admin_commission !== null
       ? Number(r.admin_commission) 
       : Math.max(0, chargeAmt - (dsComm + msComm));
     return acc + adminComm;
