@@ -530,6 +530,11 @@ export const kycApi = {
     return response.data;
   },
 
+  getAdminKycDetail: async (id: string) => {
+    const response = await apiClient.get(`/kyc/admin/request/${id}`);
+    return response.data;
+  },
+
   reviewKycRequest: async (data: {
     kyc_id?: string;
     user_id: string;

@@ -16,6 +16,7 @@ export const AdminKycManagement: React.FC = () => {
   // Modal states
   const [viewingRequest, setViewingRequest] = useState<KycVerificationRecord | null>(null);
   const [activeDocTab, setActiveDocTab] = useState<'pan' | 'aadhaar_front' | 'aadhaar_back' | 'firm_selfie' | 'cheque'>('pan');
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Reject modal
@@ -40,9 +41,30 @@ export const AdminKycManagement: React.FC = () => {
     fetchRequests(true);
     const interval = setInterval(() => {
       fetchRequests(false);
-    }, 3000);
+    }, 6000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleOpenDocs = async (req: KycVerificationRecord) => {
+    setActiveDocTab('pan');
+    setViewingRequest(req);
+
+    // If document images are not loaded yet (since list is lightweight for high performance), fetch on demand
+    if (!req.pan_card_url && !req.aadhaar_front_url) {
+      setLoadingDocs(true);
+      try {
+        const res = await kycApi.getAdminKycDetail(req.id);
+        if (res.success && res.kyc) {
+          setViewingRequest(res.kyc);
+          setRequests(prev => prev.map(r => r.id === req.id ? res.kyc : r));
+        }
+      } catch (err) {
+        console.error('Failed to load full KYC document images:', err);
+      } finally {
+        setLoadingDocs(false);
+      }
+    }
+  };
 
   const handleApprove = async (record: KycVerificationRecord) => {
     if (!window.confirm(`Are you sure you want to APPROVE KYC for ${record.user?.name || record.user_id}? This will immediately unlock their dashboard.`)) {
@@ -338,10 +360,7 @@ export const AdminKycManagement: React.FC = () => {
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => {
-                              setViewingRequest(req);
-                              setActiveDocTab('pan');
-                            }}
+                            onClick={() => handleOpenDocs(req)}
                             className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 text-xs font-bold flex items-center gap-1.5 transition"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -471,7 +490,13 @@ export const AdminKycManagement: React.FC = () => {
 
             {/* PREVIEW CONTAINER */}
             <div className="flex-1 p-6 overflow-y-auto flex flex-col items-center justify-center bg-black/40 min-h-[350px]">
-              {getDocUrl(viewingRequest, activeDocTab) ? (
+              {loadingDocs ? (
+                <div className="text-center p-8 text-slate-400 flex flex-col items-center">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
+                  <p className="text-sm font-semibold text-slate-200">Loading original KYC documents...</p>
+                  <p className="text-xs text-slate-500 mt-1">Fetching high-resolution files from secure storage</p>
+                </div>
+              ) : getDocUrl(viewingRequest, activeDocTab) ? (
                 <div className="max-w-2xl w-full flex flex-col items-center">
                   <img
                     src={getDocUrl(viewingRequest, activeDocTab)}

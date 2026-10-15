@@ -44,11 +44,11 @@ export interface UserProfile {
 export interface KycVerificationRecord {
   id: string;
   user_id: string;
-  pan_card_url: string;
-  aadhaar_front_url: string;
-  aadhaar_back_url: string;
-  firm_selfie_url: string;
-  cheque_url: string;
+  pan_card_url?: string;
+  aadhaar_front_url?: string;
+  aadhaar_back_url?: string;
+  firm_selfie_url?: string;
+  cheque_url?: string;
   status: KycStatus;
   rejection_reason?: string | null;
   submitted_at: string;

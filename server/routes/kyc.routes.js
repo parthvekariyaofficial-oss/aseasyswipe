@@ -109,7 +109,7 @@ router.post('/submit', verifyToken, async (req, res) => {
 
 // -----------------------------------------------------------------------------
 // GET /api/kyc/my-status
-// Returns active KYC status and latest submitted record for current user
+// Returns active KYC status and latest submitted record for current user (lightweight)
 // -----------------------------------------------------------------------------
 router.get('/my-status', verifyToken, async (req, res) => {
   try {
@@ -120,7 +120,7 @@ router.get('/my-status', verifyToken, async (req, res) => {
       try {
         const { data } = await supabase
           .from('kyc_verifications')
-          .select('*')
+          .select('id, user_id, status, rejection_reason, submitted_at, reviewed_at, created_at')
           .eq('user_id', userId)
           .order('submitted_at', { ascending: false })
           .limit(1)
@@ -148,7 +148,7 @@ router.get('/my-status', verifyToken, async (req, res) => {
 
 // -----------------------------------------------------------------------------
 // GET /api/kyc/admin/requests
-// Admin fetches all KYC submissions with user profile information
+// Admin fetches all KYC submissions (lightweight metadata for instant rendering)
 // -----------------------------------------------------------------------------
 router.get('/admin/requests', verifyToken, requireRoles(['admin']), async (req, res) => {
   try {
@@ -159,7 +159,15 @@ router.get('/admin/requests', verifyToken, requireRoles(['admin']), async (req, 
         const { data, error } = await supabase
           .from('kyc_verifications')
           .select(`
-            *,
+            id,
+            user_id,
+            status,
+            rejection_reason,
+            submitted_at,
+            reviewed_at,
+            reviewed_by,
+            created_at,
+            updated_at,
             users_profiles (
               id,
               name,
@@ -178,18 +186,29 @@ router.get('/admin/requests', verifyToken, requireRoles(['admin']), async (req, 
             ...item,
             user: item.users_profiles || null
           }));
+          db.kyc_verifications_meta = list;
+        } else if (error) {
+          console.error('Supabase Admin KYC Fetch Error:', error);
         }
       } catch (sbErr) {
-        console.error('Supabase Admin KYC Fetch Error:', sbErr);
+        console.error('Supabase Admin KYC Fetch Catch Error:', sbErr);
       }
     }
 
     // Fallback or merge with in-memory if Supabase is offline or empty
-    if (list.length === 0 && db.kyc_verifications.length > 0) {
-      list = db.kyc_verifications.map(item => {
+    if (list.length === 0 && (db.kyc_verifications_meta?.length > 0 || db.kyc_verifications.length > 0)) {
+      list = db.kyc_verifications_meta || db.kyc_verifications.map(item => {
         const user = (db.users || []).find(u => u.id === item.user_id);
         return {
-          ...item,
+          id: item.id,
+          user_id: item.user_id,
+          status: item.status,
+          rejection_reason: item.rejection_reason,
+          submitted_at: item.submitted_at,
+          reviewed_at: item.reviewed_at,
+          reviewed_by: item.reviewed_by,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
           user: user ? sanitizeUser(user) : null
         };
       });
@@ -202,6 +221,71 @@ router.get('/admin/requests', verifyToken, requireRoles(['admin']), async (req, 
   } catch (error) {
     console.error('Admin KYC Requests Error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch KYC requests.' });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/kyc/admin/request/:id
+// Admin fetches full details with all 5 document images for a single submission
+// -----------------------------------------------------------------------------
+router.get('/admin/request/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    const kycId = req.params.id;
+    let kycRecord = null;
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('kyc_verifications')
+          .select(`
+            *,
+            users_profiles (
+              id,
+              name,
+              firm_name,
+              mobile_number,
+              email,
+              role,
+              status,
+              created_at
+            )
+          `)
+          .eq('id', kycId)
+          .maybeSingle();
+
+        if (!error && data) {
+          kycRecord = {
+            ...data,
+            user: data.users_profiles || null
+          };
+        }
+      } catch (sbErr) {
+        console.error('Supabase Admin Single KYC Fetch Catch Error:', sbErr);
+      }
+    }
+
+    if (!kycRecord) {
+      const memRecord = (db.kyc_verifications || []).find(k => k.id === kycId);
+      if (memRecord) {
+        const user = (db.users || []).find(u => u.id === memRecord.user_id);
+        kycRecord = {
+          ...memRecord,
+          user: user ? sanitizeUser(user) : null
+        };
+      }
+    }
+
+    if (!kycRecord) {
+      return res.status(404).json({ success: false, message: 'KYC record not found.' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      kyc: kycRecord
+    });
+  } catch (error) {
+    console.error('Admin KYC Detail Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch KYC details.' });
   }
 });
 
