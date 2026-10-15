@@ -92,7 +92,7 @@ export default function App() {
     if (tab === 'change_password') return '/change-password';
     if (tab === 'admin_kyc') return '/admin-kyc';
     if (tab === 'admin_payout') return '/admin-payout';
-    if (tab === 'api_fund_request') return '/api-fund-request';
+    if (tab === 'api_fund_request') return '/fund-request';
     if (tab === 'payout_transfer') return '/payout';
     if (tab === 'admin_statement') return '/admin-statement';
     if (tab === 'user_statement') return '/statement';

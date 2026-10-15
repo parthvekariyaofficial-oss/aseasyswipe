@@ -63,26 +63,33 @@ app.use('/api/payout', payoutRoutes);
 app.use('/api/statement', statementRoutes);
 app.use('/api/kyc', kycRoutes);
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled Error:', err);
-  res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
-});
-
-// Serve frontend static build in production
+// Serve frontend static build in production (SPA fallback)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, '../dist');
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
+
+  // Explicit handlers for fund request SPA routes to guarantee index.html is served
+  app.get(['/api-fund-request', '/fund-request', '/api-fund-request/*', '/fund-request/*'], (req, res) => {
+    return res.sendFile(path.join(distPath, 'index.html'));
+  });
+
+  app.get('*', (req, res, next) => {
+    // Only pass through actual backend API endpoints that start with /api/ or match /api
+    if (req.path.startsWith('/api/') || req.path === '/api') {
+      return res.status(404).json({ success: false, message: `Cannot ${req.method} ${req.path}` });
     }
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
+});
 
 // Start Express Server
 app.listen(PORT, '0.0.0.0', () => {
