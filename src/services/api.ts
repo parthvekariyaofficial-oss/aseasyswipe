@@ -5,7 +5,8 @@ import type {
   UsePayAdminBankAccount, 
   ApiFundRequestPayload, 
   ApiFundRequestRecord, 
-  FundRequestStatusResponse 
+  FundRequestStatusResponse,
+  Biller
 } from '../types/b2b';
 export { supabase } from '../lib/supabase';
 
@@ -426,6 +427,22 @@ export const b2bApi = {
 
   checkFundRequestStatus: async (requestId: string): Promise<FundRequestStatusResponse> => {
     const response = await apiClient.get(`/b2b/fund-request/status/${encodeURIComponent(requestId)}`);
+    return response.data;
+  },
+
+  // CREDIT CARD BILLER ADMIN TOGGLE APIS
+  getAdminCcBillers: async (): Promise<{ success: boolean; data: Biller[]; stats: { total: number; active: number; inactive: number } }> => {
+    const response = await apiClient.get('/b2b/admin/ccbiller');
+    return response.data;
+  },
+
+  toggleCcBiller: async (billerId: string, is_active?: boolean): Promise<{ success: boolean; message: string; biller_id: string; is_active: boolean }> => {
+    const response = await apiClient.patch(`/b2b/admin/ccbiller/${encodeURIComponent(billerId)}/toggle`, { is_active });
+    return response.data;
+  },
+
+  bulkToggleCcBillers: async (is_active: boolean): Promise<{ success: boolean; message: string; is_active: boolean }> => {
+    const response = await apiClient.post('/b2b/admin/ccbiller/bulk-toggle', { is_active });
     return response.data;
   }
 };

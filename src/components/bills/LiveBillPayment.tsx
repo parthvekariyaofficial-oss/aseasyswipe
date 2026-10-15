@@ -397,8 +397,10 @@ export const LiveBillPayment: React.FC = () => {
 
   const safeBillers = Array.isArray(billers) ? billers : [];
   const filteredBillers = safeBillers.filter(b => 
-    (b.biller_name || '').toLowerCase().includes(billerSearch.toLowerCase()) ||
-    (b.biller_id || '').toLowerCase().includes(billerSearch.toLowerCase())
+    b.is_active !== false && (
+      (b.biller_name || '').toLowerCase().includes(billerSearch.toLowerCase()) ||
+      (b.biller_id || '').toLowerCase().includes(billerSearch.toLowerCase())
+    )
   );
 
   if (!liveBillPayEnabled) {

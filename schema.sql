@@ -203,9 +203,12 @@ CREATE TABLE IF NOT EXISTS public.credit_card_billers (
     category_id INTEGER DEFAULT 7,
     payment_modes JSONB DEFAULT '["Cash", "UPI", "Internet Banking", "Debit Card"]',
     metadata JSONB,
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.credit_card_billers ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 
 ALTER TABLE IF EXISTS public.credit_card_billers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all access to credit_card_billers" ON public.credit_card_billers;

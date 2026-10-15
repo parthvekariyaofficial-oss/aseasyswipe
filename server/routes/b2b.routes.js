@@ -676,14 +676,18 @@ const loadCreditCardBillersFromDatabase = async () => {
   try {
     const { data, error } = await supabase
       .from('credit_card_billers')
-      .select('*');
+      .select('*')
+      .order('biller_name', { ascending: true });
       
     if (!error && data && data.length > 0) {
       // Filter out any non-Credit Card or eChallan billers
       const cleanData = data.filter(b => 
         (b.category_id === 7 || b.category === 'Credit Card') && 
         !b.biller_name.toLowerCase().includes('challan')
-      );
+      ).map(b => ({
+        ...b,
+        is_active: b.is_active !== false // default true
+      }));
       return cleanData;
     }
     return db.credit_card_billers || [];
@@ -706,13 +710,17 @@ const saveBillersToDatabase = async (billersToSync) => {
       !b.biller_name.toLowerCase().includes('challan')
     );
 
+    // Existing active state map to avoid overwriting admin's toggle
+    const existingMap = new Map((db.credit_card_billers || []).map(b => [b.biller_id, b.is_active]));
+
     const rows = cleanBillers.map(b => ({
       biller_id: b.biller_id,
       biller_name: b.biller_name,
       category: 'Credit Card',
       category_id: 7,
       payment_modes: b.payment_modes || ["Cash", "UPI", "Internet Banking", "Debit Card"],
-      metadata: b.metadata || {}
+      metadata: b.metadata || {},
+      is_active: existingMap.has(b.biller_id) ? existingMap.get(b.biller_id) : true
     }));
 
     if (rows.length > 0) {
@@ -749,25 +757,27 @@ router.get('/categories', verifyToken, async (req, res) => {
 
 /**
  * GET /api/b2b/billers
- * Fetch Directory of Credit Card Billers directly from PostgreSQL Database
+ * Fetch Directory of Active Credit Card Billers for Live Bill Pay
+ * (Inactive billers turned OFF by admin are hidden from this dropdown)
  */
 router.get('/billers', verifyToken, async (req, res) => {
   const baseUrl = (usepayConfig.baseUrl || process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
   const { page, limit } = req.query;
 
-  // 1. Try fetching live billers from UsePay B2B API
-  try {
-    const response = await axios.get(`${baseUrl}/billers`, {
-      headers: getAuthHeaders(),
-      params: { category_id: 7, page, limit },
-      timeout: 8000
-    });
-    if (response.data && response.data.status === 'success' && Array.isArray(response.data.data) && response.data.data.length > 0) {
-      // Save live API billers directly into database
-      await saveBillersToDatabase(response.data.data);
+  // 1. Try fetching live billers from UsePay B2B API if empty
+  if (!db.credit_card_billers || db.credit_card_billers.length === 0) {
+    try {
+      const response = await axios.get(`${baseUrl}/billers`, {
+        headers: getAuthHeaders(),
+        params: { category_id: 7, page, limit },
+        timeout: 8000
+      });
+      if (response.data && response.data.status === 'success' && Array.isArray(response.data.data) && response.data.data.length > 0) {
+        await saveBillersToDatabase(response.data.data);
+      }
+    } catch (err) {
+      console.warn('[UsePay Credit Card Billers Warning]: Serving directly from database:', err.message);
     }
-  } catch (err) {
-    console.warn('[UsePay Credit Card Billers Warning]: Serving directly from database:', err.message);
   }
 
   // 2. Load directly from PostgreSQL Database
@@ -776,15 +786,132 @@ router.get('/billers', verifyToken, async (req, res) => {
     db.credit_card_billers = dbBillers;
   }
 
+  // Filter ONLY active billers for retail/live bill pay users!
+  const activeBillers = (db.credit_card_billers || []).filter(b => b.is_active !== false);
+
   return res.status(200).json({
     status: 'success',
-    data: db.credit_card_billers,
+    data: activeBillers,
     pagination: {
       page: Number(page) || 1,
       limit: Number(limit) || 100,
-      total_records: db.credit_card_billers.length,
+      total_records: activeBillers.length,
       total_pages: 1
     }
+  });
+});
+
+/**
+ * GET /api/b2b/admin/ccbiller
+ * Returns ALL Credit Card Billers (active + inactive) with statistics for Admin Management
+ */
+router.get('/admin/ccbiller', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const dbBillers = await loadCreditCardBillersFromDatabase();
+  if (dbBillers && dbBillers.length > 0) {
+    db.credit_card_billers = dbBillers;
+  }
+
+  const allBillers = (db.credit_card_billers || []).map(b => ({
+    biller_id: b.biller_id,
+    biller_name: b.biller_name,
+    category: b.category || 'Credit Card',
+    category_id: b.category_id || 7,
+    payment_modes: b.payment_modes,
+    is_active: b.is_active !== false,
+    updated_at: b.updated_at || b.created_at || new Date().toISOString()
+  }));
+
+  const activeCount = allBillers.filter(b => b.is_active).length;
+  const inactiveCount = allBillers.filter(b => !b.is_active).length;
+
+  return res.status(200).json({
+    success: true,
+    status: 'success',
+    data: allBillers,
+    stats: {
+      total: allBillers.length,
+      active: activeCount,
+      inactive: inactiveCount
+    }
+  });
+});
+
+/**
+ * PATCH /api/b2b/admin/ccbiller/:billerId/toggle
+ * Toggle active/inactive status of a specific biller
+ */
+router.patch('/admin/ccbiller/:billerId/toggle', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const { billerId } = req.params;
+  const { is_active } = req.body;
+
+  if (!billerId) {
+    return res.status(400).json({ success: false, status: 'error', message: 'Biller ID is required.' });
+  }
+
+  // Find in memory
+  let biller = (db.credit_card_billers || []).find(b => b.biller_id === billerId);
+  const newStatus = typeof is_active === 'boolean' ? is_active : !(biller ? biller.is_active : true);
+
+  if (biller) {
+    biller.is_active = newStatus;
+    biller.updated_at = new Date().toISOString();
+  }
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('credit_card_billers')
+        .update({
+          is_active: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('biller_id', billerId);
+    } catch (dbErr) {
+      console.warn('[CCBiller Toggle DB Error]:', dbErr.message);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    status: 'success',
+    message: `Biller "${biller?.biller_name || billerId}" is now ${newStatus ? 'ACTIVE (Visible in Dropdown)' : 'INACTIVE (Hidden from Dropdown)'}.`,
+    biller_id: billerId,
+    is_active: newStatus
+  });
+});
+
+/**
+ * POST /api/b2b/admin/ccbiller/bulk-toggle
+ * Bulk enable or disable all billers
+ */
+router.post('/admin/ccbiller/bulk-toggle', verifyToken, requireRoles(['admin']), async (req, res) => {
+  const { is_active } = req.body;
+  const targetStatus = Boolean(is_active);
+
+  (db.credit_card_billers || []).forEach(b => {
+    b.is_active = targetStatus;
+    b.updated_at = new Date().toISOString();
+  });
+
+  if (supabase) {
+    try {
+      await supabase
+        .from('credit_card_billers')
+        .update({
+          is_active: targetStatus,
+          updated_at: new Date().toISOString()
+        })
+        .neq('biller_id', '');
+    } catch (dbErr) {
+      console.warn('[CCBiller Bulk Toggle DB Error]:', dbErr.message);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    status: 'success',
+    message: `All Credit Card billers have been turned ${targetStatus ? 'ON (Active)' : 'OFF (Hidden)'}.`,
+    is_active: targetStatus
   });
 });
 

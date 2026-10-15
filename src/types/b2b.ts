@@ -39,6 +39,8 @@ export interface Biller {
   category: string;
   category_id?: number;
   payment_modes: string[];
+  is_active?: boolean;
+  updated_at?: string;
   metadata?: {
     billerInputParams?: {
       paramInfo?: BillerInputParam[];

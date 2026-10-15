@@ -21,6 +21,7 @@ import { UserBillPaymentRequest } from './components/bills/UserBillPaymentReques
 import { AdminBillRequestsManagement } from './components/bills/AdminBillRequestsManagement';
 import { LiveBillPayment } from './components/bills/LiveBillPayment';
 import { AdminLiveBillPayHistory } from './components/bills/AdminLiveBillPayHistory';
+import { AdminCcBillerManagement } from './components/bills/AdminCcBillerManagement';
 import { AdminPayoutManagement } from './components/payout/AdminPayoutManagement';
 import { AdminFundRequestManagement } from './components/b2b/AdminFundRequestManagement';
 import { UserPayoutTransfer } from './components/payout/UserPayoutTransfer';
@@ -54,6 +55,7 @@ export default function App() {
     if (p.includes('dashboard')) return 'dashboard';
     if (p.includes('bank-entry') || p.includes('bank_entry')) return 'bank_entry';
     if (p.includes('admin-bill-requests') || p.includes('admin_bill_requests')) return 'admin_bill_requests';
+    if (p.includes('ccbiller')) return 'ccbiller';
     if (p.includes('live-bill-history') || p.includes('live_bill_history')) return 'live_bill_history';
     if (p.includes('live-bill-pay') || p.includes('live_bill_pay')) {
       if (role === 'user') {
@@ -99,6 +101,7 @@ export default function App() {
     if (tab === 'bank_entry') return '/bank-entry';
     if (tab === 'admin_bill_requests') return '/admin-bill-requests';
     if (tab === 'live_bill_history') return '/live-bill-history';
+    if (tab === 'ccbiller') return '/ccbiller';
     if (tab === 'live_bill_pay') return '/live-bill-pay';
     if (tab === 'bill_request') return '/bill-request';
     if (tab === 'qr_master') return '/qr-master';
@@ -260,6 +263,8 @@ export default function App() {
         return 'CC Bill Requests';
       case 'live_bill_history':
         return 'LiveBillPay History';
+      case 'ccbiller':
+        return 'ccbiller';
       case 'admin_payout':
         return 'Payout Slabs & Txns';
       case 'api_fund_request':
@@ -529,6 +534,11 @@ export default function App() {
               <AdminLiveBillPayHistory />
             </ProtectedRoute>
           )}
+          {activeTab === 'ccbiller' && (
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminCcBillerManagement />
+            </ProtectedRoute>
+          )}
           {activeTab === 'live_bill_pay' && (
             user.role === 'user' ? (
               liveBillPayEnabled ? <LiveBillPayment /> : renderDashboardByRole(user.role)
@@ -563,7 +573,7 @@ export default function App() {
             </ProtectedRoute>
           )}
           {activeTab === 'users' && renderDashboardByRole(user.role)}
-          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'api_fund_request' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'qr_gallery' && activeTab !== 'manage_tpin' && activeTab !== 'change_mpin' && activeTab !== 'change_password' && activeTab !== 'users' && renderDashboardByRole(user.role)}
+          {activeTab !== 'dashboard' && activeTab !== 'admin_kyc' && activeTab !== 'admin_payout' && activeTab !== 'api_fund_request' && activeTab !== 'admin_statement' && activeTab !== 'user_statement' && activeTab !== 'payout_transfer' && activeTab !== 'bank_entry' && activeTab !== 'admin_bill_requests' && activeTab !== 'live_bill_history' && activeTab !== 'ccbiller' && activeTab !== 'live_bill_pay' && activeTab !== 'bill_request' && activeTab !== 'qr_master' && activeTab !== 'qr_requests' && activeTab !== 'qr_gallery' && activeTab !== 'manage_tpin' && activeTab !== 'change_mpin' && activeTab !== 'change_password' && activeTab !== 'users' && renderDashboardByRole(user.role)}
         </main>
       </div>
     </div>

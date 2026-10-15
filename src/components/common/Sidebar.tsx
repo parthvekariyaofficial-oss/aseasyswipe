@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { userApi } from '../../services/api';
 import { 
-  LogOut, Users, ChevronRight, X, Key, KeyRound, Lock, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck, Images
+  LogOut, Users, ChevronRight, X, Key, KeyRound, Lock, QrCode, FileText, CreditCard, LayoutDashboard, Landmark, Receipt, Zap, Clock, ArrowRightLeft, ShieldCheck, Images, Sliders
 } from 'lucide-react';
 
 export interface SidebarNavItem {
@@ -121,6 +121,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'live_bill_history',
           label: 'LiveBillPay History',
           icon: Clock
+        },
+        {
+          id: 'ccbiller',
+          label: 'ccbiller',
+          icon: Sliders
         },
         {
           id: 'admin_payout',
