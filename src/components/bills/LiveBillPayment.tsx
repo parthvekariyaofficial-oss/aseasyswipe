@@ -282,6 +282,17 @@ export const LiveBillPayment: React.FC = () => {
 
   // Step 2: Open Payment Modal
   const openPayModal = () => {
+    if (payAmount >= 50000) {
+      const cleanPan = customerPan.trim().toUpperCase();
+      if (!cleanPan) {
+        alert('Please enter a valid 10-digit Customer PAN Card for payments of ₹50,000 or above.');
+        return;
+      }
+      if (!PAN_REGEX.test(cleanPan)) {
+        alert('Invalid Customer PAN format! PAN must be 10 characters (5 letters, 4 numbers, 1 letter, e.g. ABCDE1234F).');
+        return;
+      }
+    }
     setPayResult(null);
     setPayError(null);
     setTpin('');
@@ -653,6 +664,51 @@ export const LiveBillPayment: React.FC = () => {
                         <span className="font-bold text-white font-mono">₹{info.infoValue}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* CUSTOMER PAN CARD INPUT IN FETCHED CARD DETAILS (WHEN AMOUNT >= 50,000) */}
+                {payAmount >= 50000 && (
+                  <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-300">
+                        Customer PAN Card <span className="text-rose-400">*</span>
+                      </label>
+                      <span className="text-[10px] text-amber-400 font-mono font-bold">
+                        Required for ≥ ₹50,000
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        maxLength={10}
+                        required
+                        placeholder="e.g. ABCDE1234F"
+                        value={customerPan}
+                        onChange={(e) => setCustomerPan(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+                        className={`w-full bg-slate-900 border rounded-xl p-3 text-sm font-mono tracking-widest text-white focus:outline-none transition ${
+                          customerPan.length === 10
+                            ? PAN_REGEX.test(customerPan)
+                              ? 'border-emerald-500/80 focus:border-emerald-500'
+                              : 'border-rose-500/80 focus:border-rose-500'
+                            : 'border-slate-800 focus:border-indigo-500'
+                        }`}
+                      />
+                      {customerPan.length === 10 && (
+                        <div className="absolute right-3 top-3.5 flex items-center gap-1 text-[11px] font-bold">
+                          {PAN_REGEX.test(customerPan) ? (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 className="w-4 h-4" /> Valid PAN
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 flex items-center gap-1">
+                              <AlertCircle className="w-4 h-4" /> Invalid PAN
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
