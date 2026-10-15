@@ -291,6 +291,15 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({
       if (userToEdit) {
         const res = await userApi.updateUser(userToEdit.id, payload);
         if (res.success) {
+          userToEdit.qr_charge_percent = finalCharge;
+          userToEdit.charge_percentage = finalCharge;
+          userToEdit.home_address = homeAddress;
+          userToEdit.firm_address = firmAddress;
+          userToEdit.firm_name = firmName;
+          userToEdit.name = payload.name;
+          userToEdit.email = email;
+          userToEdit.mobile_number = mobileNumber;
+          userToEdit.role = role;
           setSuccessMessage(res.message || 'User updated successfully!');
           if (onUserAdded) onUserAdded();
           setTimeout(() => {

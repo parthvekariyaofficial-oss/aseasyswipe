@@ -21,8 +21,14 @@ if (supabase) {
       const existingMap = new Map((db.users || []).map(u => [u.id, u]));
       db.users = combined.map(dbU => {
         const memU = existingMap.get(dbU.id);
+        const val = dbU.qr_charge_percent !== undefined && dbU.qr_charge_percent !== null 
+          ? Number(dbU.qr_charge_percent) 
+          : (memU?.qr_charge_percent !== undefined ? Number(memU.qr_charge_percent) : 0);
+        const cleanCharge = isNaN(val) ? 0 : val;
         return {
           ...dbU,
+          qr_charge_percent: cleanCharge,
+          charge_percentage: cleanCharge,
           home_address: dbU.home_address !== undefined && dbU.home_address !== null && dbU.home_address !== ''
             ? dbU.home_address
             : (memU?.home_address || ''),
@@ -150,8 +156,14 @@ router.get('/hierarchy', verifyToken, async (req, res) => {
           const existingMap = new Map((db.users || []).map(u => [u.id, u]));
           db.users = data.map(dbU => {
             const memU = existingMap.get(dbU.id);
+            const val = dbU.qr_charge_percent !== undefined && dbU.qr_charge_percent !== null 
+              ? Number(dbU.qr_charge_percent) 
+              : (memU?.qr_charge_percent !== undefined ? Number(memU.qr_charge_percent) : 0);
+            const cleanCharge = isNaN(val) ? 0 : val;
             return {
               ...dbU,
+              qr_charge_percent: cleanCharge,
+              charge_percentage: cleanCharge,
               home_address: dbU.home_address !== undefined && dbU.home_address !== null && dbU.home_address !== ''
                 ? dbU.home_address
                 : (memU?.home_address || ''),
@@ -420,6 +432,7 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
       try {
         const targetTable = newUser.role === 'admin' ? 'admin_profiles' : 'users_profiles';
         const payload = { ...newUser };
+        delete payload.charge_percentage; // not a column in database
         if (newUser.role === 'admin') {
           delete payload.tpin;
           delete payload.tpin_set;
@@ -433,13 +446,14 @@ router.post('/create-subuser', verifyToken, requireRoles(['admin', 'super_distri
           delete payload.mpin_set;
         }
         let { error: sbErr } = await supabase.from(targetTable).insert([payload]);
-        if (sbErr && (sbErr.message?.includes('home_address') || sbErr.message?.includes('firm_address') || sbErr.message?.includes('first_name') || sbErr.message?.includes('middle_name') || sbErr.message?.includes('last_name'))) {
+        if (sbErr) {
           const safePayload = { ...payload };
           delete safePayload.home_address;
           delete safePayload.firm_address;
           delete safePayload.first_name;
           delete safePayload.middle_name;
           delete safePayload.last_name;
+          delete safePayload.charge_percentage;
           const retryRes = await supabase.from(targetTable).insert([safePayload]);
           sbErr = retryRes.error;
         }
@@ -582,7 +596,7 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
     } else if (charge_percentage !== undefined && charge_percentage !== null && charge_percentage !== '') {
       const p = parseFloat(charge_percentage);
       if (!isNaN(p)) newChargeVal = p;
-    } else if (qr_charge_percent === 0 || qr_charge_percent === '0' || charge_percentage === 0 || charge_percentage === '0') {
+    } else if (qr_charge_percent === 0 || qr_charge_percent === '0' || qr_charge_percent === '' || charge_percentage === 0 || charge_percentage === '0' || charge_percentage === '') {
       newChargeVal = 0;
     }
 
@@ -597,6 +611,7 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
       try {
         const targetTable = targetUser.role === 'admin' ? 'admin_profiles' : 'users_profiles';
         const payload = { ...targetUser };
+        delete payload.charge_percentage; // not a column in database
         if (targetUser.role === 'admin') {
           delete payload.tpin;
           delete payload.wallet_balance;
@@ -606,14 +621,21 @@ router.put('/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
           delete payload.super_distributor_id;
         }
         let { error: sbErr } = await supabase.from(targetTable).update(payload).eq('id', userId);
-        if (sbErr && (sbErr.message?.includes('home_address') || sbErr.message?.includes('firm_address') || sbErr.message?.includes('first_name') || sbErr.message?.includes('middle_name') || sbErr.message?.includes('last_name'))) {
+        if (sbErr) {
           const safePayload = { ...payload };
           delete safePayload.home_address;
           delete safePayload.firm_address;
           delete safePayload.first_name;
           delete safePayload.middle_name;
           delete safePayload.last_name;
-          await supabase.from(targetTable).update(safePayload).eq('id', userId);
+          delete safePayload.charge_percentage;
+          const retryRes = await supabase.from(targetTable).update(safePayload).eq('id', userId);
+          sbErr = retryRes.error;
+        }
+        if (sbErr) {
+          console.error('[PUT /users/:id] Supabase Update Error:', sbErr);
+        } else {
+          console.log(`[PUT /users/:id] Supabase successfully updated user ${userId}. QR Charge: ${targetUser.qr_charge_percent}`);
         }
       } catch (sbErr) {
         console.error('Supabase Update User Error:', sbErr);
