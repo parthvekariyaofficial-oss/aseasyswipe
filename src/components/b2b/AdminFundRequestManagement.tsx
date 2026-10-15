@@ -276,111 +276,30 @@ export const AdminFundRequestManagement: React.FC = () => {
 
       {/* CONTENT BASED ON ACTIVE TAB */}
       {activeTab === 'submit' ? (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* 1. USEPAY DEPOSIT BANK ACCOUNTS */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          {/* LEFT COLUMN: THE SUBMISSION FORM */}
+          <div className="lg:col-span-7 xl:col-span-8 bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                  <Landmark className="w-4 h-4" />
+                  <Zap className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-white uppercase tracking-wider">
-                    UsePay Official Deposit Bank Accounts
+                  <h2 className="text-base font-black text-white uppercase tracking-wider">
+                    Submit B2B Wallet Top-Up
                   </h2>
-                  <p className="text-[11px] text-slate-400">Transfer funds to any account below and enter UTR in the form</p>
+                  <p className="text-xs text-slate-400">
+                    Electronic fund request queued directly for B2B Admin verification & approval
+                  </p>
                 </div>
               </div>
+              <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono">
+                POST /fund-request
+              </span>
             </div>
 
-            {banksLoading ? (
-              <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
-                Loading official bank accounts...
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {bankAccounts.map((bank) => (
-                  <div
-                    key={bank.id}
-                    className={`p-4 rounded-2xl border transition relative ${
-                      adminBankAccountId === bank.id
-                        ? 'bg-indigo-950/40 border-indigo-500/60 shadow-lg'
-                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <span className="text-sm font-black text-white">{bank.bank_name}</span>
-                        <p className="text-xs text-slate-400">{bank.account_holder_name}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setAdminBankAccountId(bank.id)}
-                        className={`text-xs font-bold px-3 py-1 rounded-xl transition ${
-                          adminBankAccountId === bank.id
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        {adminBankAccountId === bank.id ? '✓ Selected' : 'Select'}
-                      </button>
-                    </div>
-
-                    <div className="space-y-2 text-xs font-mono">
-                      <div className="flex items-center justify-between bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800">
-                        <span className="text-slate-400">Account Number:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-bold">{bank.account_number}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(bank.account_number, `ac_${bank.id}`)}
-                            className="text-slate-400 hover:text-white"
-                          >
-                            {copiedText === `ac_${bank.id}` ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800">
-                        <span className="text-slate-400">IFSC Code:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-indigo-300 font-bold">{bank.ifsc_code}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(bank.ifsc_code, `ifsc_${bank.id}`)}
-                            className="text-slate-400 hover:text-white"
-                          >
-                            {copiedText === `ifsc_${bank.id}` ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {bank.upi_id && (
-                        <div className="flex items-center justify-between bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800">
-                          <span className="text-slate-400">UPI ID:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-300 font-bold">{bank.upi_id}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(bank.upi_id!, `upi_${bank.id}`)}
-                              className="text-slate-400 hover:text-white"
-                            >
-                              {copiedText === `upi_${bank.id}` ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 2. SUBMISSION FORM */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl">
-            <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+            <form onSubmit={handleSubmit} className="space-y-6 w-full">
               
               {/* WALLET TYPE SELECTION (ONLY ACTIVE SERVICES SHOWN) */}
               <div className="space-y-2.5">
@@ -404,14 +323,14 @@ export const AdminFundRequestManagement: React.FC = () => {
                     <span>No wallet services are currently active from the UsePay API provider.</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5">
                     {activeServices.map((service) => (
                       <div
                         key={service.wallet_type}
                         onClick={() => setWalletType(service.wallet_type)}
                         className={`cursor-pointer p-4 rounded-2xl border transition-all flex flex-col justify-between ${
                           walletType === service.wallet_type
-                            ? 'bg-gradient-to-br from-indigo-950/60 to-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-lg'
+                            ? 'bg-gradient-to-br from-indigo-950/70 to-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-lg'
                             : 'bg-slate-950 border-slate-800 hover:border-slate-700 opacity-90'
                         }`}
                       >
@@ -605,6 +524,227 @@ export const AdminFundRequestManagement: React.FC = () => {
                 )}
               </button>
             </form>
+          </div>
+
+          {/* RIGHT COLUMN: OFFICIAL BANK ACCOUNTS & GUIDES */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+            
+            {/* 1. USEPAY OFFICIAL DEPOSIT BANK ACCOUNTS */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                    <Landmark className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                      Official Deposit Accounts
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Click to select for this deposit</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadBankAccounts}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                  title="Refresh Bank Accounts"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${banksLoading ? 'animate-spin text-indigo-400' : ''}`} />
+                </button>
+              </div>
+
+              {banksLoading ? (
+                <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
+                  Loading bank accounts...
+                </div>
+              ) : bankAccounts.length === 0 ? (
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-500">
+                  No bank accounts configured from API.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bankAccounts.map((bank) => (
+                    <div
+                      key={bank.id}
+                      onClick={() => setAdminBankAccountId(bank.id)}
+                      className={`p-4 rounded-2xl border transition cursor-pointer relative ${
+                        adminBankAccountId === bank.id
+                          ? 'bg-gradient-to-br from-indigo-950/60 to-slate-900 border-indigo-500 ring-2 ring-indigo-500/20 shadow-lg'
+                          : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2.5">
+                        <div>
+                          <span className="text-xs font-black text-white">{bank.bank_name}</span>
+                          <p className="text-[11px] text-slate-400">{bank.account_holder_name}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg transition ${
+                          adminBankAccountId === bank.id
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {adminBankAccountId === bank.id ? '✓ Selected' : 'Select'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs font-mono">
+                        <div className="flex items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-400 text-[10px]">A/C No:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-white font-bold">{bank.account_number}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopy(bank.account_number, `ac_${bank.id}`);
+                              }}
+                              className="text-slate-400 hover:text-white"
+                              title="Copy Account Number"
+                            >
+                              {copiedText === `ac_${bank.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
+                          <span className="text-slate-400 text-[10px]">IFSC:</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-indigo-300 font-bold">{bank.ifsc_code}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopy(bank.ifsc_code, `ifsc_${bank.id}`);
+                              }}
+                              className="text-slate-400 hover:text-white"
+                              title="Copy IFSC Code"
+                            >
+                              {copiedText === `ifsc_${bank.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {bank.upi_id && (
+                          <div className="flex items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
+                            <span className="text-slate-400 text-[10px]">UPI:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-emerald-300 font-bold text-[11px] truncate max-w-[150px]">{bank.upi_id}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(bank.upi_id!, `upi_${bank.id}`);
+                                }}
+                                className="text-slate-400 hover:text-white"
+                                title="Copy UPI ID"
+                              >
+                                {copiedText === `upi_${bank.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 2. TARGET WALLET GUIDELINES CARD */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-3.5">
+              <div className="flex items-center gap-2 text-indigo-400 border-b border-slate-800/80 pb-3">
+                <ShieldCheck className="w-4 h-4" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                  Target Wallet Selection Guide
+                </h3>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-start gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-bold text-amber-300 block">CSPL Fast Bill ("cspl")</span>
+                    <span className="text-[11px] text-slate-400">For instant sub-second bill payment API (/cspl/pay-bill).</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-start gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-300 block">BBPS Utility ("bbps")</span>
+                    <span className="text-[11px] text-slate-400">For standard BillAvenue utility payments (/pay-bill).</span>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-start gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 mt-1 shrink-0" />
+                  <div>
+                    <span className="font-bold text-indigo-300 block">Bank Payout ("payout")</span>
+                    <span className="text-[11px] text-slate-400">For 24x7 IMPS / NEFT instant transfers (/payout/transfer).</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 leading-relaxed">
+                ⚠️ <strong className="text-amber-200">Notice:</strong> Deposited funds are credited strictly to the destination wallet selected above.
+              </div>
+            </div>
+
+            {/* 3. RECENT REQUESTS SUMMARY */}
+            {historyList.length > 0 && (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                      Recent Requests
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('history')}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold transition flex items-center gap-1"
+                  >
+                    <span>View All ({historyList.length})</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {historyList.slice(0, 3).map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold font-mono text-white">
+                            ₹{Number(r.amount).toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-[10px] text-slate-400 uppercase font-mono">
+                            ({r.wallet_type})
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono block mt-0.5 truncate max-w-[140px]">
+                          UTR: {r.utr_number}
+                        </span>
+                      </div>
+
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        r.status === 'approved'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : r.status === 'rejected'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                      }`}>
+                        {r.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
 
         </div>
