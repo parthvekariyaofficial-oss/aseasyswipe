@@ -303,12 +303,24 @@ router.get('/list', verifyToken, async (req, res) => {
     }
 
     // Enrich with user name & mobile if missing
+    let userProfilesMap = new Map();
+    if (supabase) {
+      try {
+        const { data: uData } = await supabase.from('users_profiles').select('id, name, mobile_number');
+        if (Array.isArray(uData)) {
+          uData.forEach(u => userProfilesMap.set(u.id, u));
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     requestsList = requestsList.map(r => {
-      const u = (db.users || []).find(usr => usr.id === r.user_id);
+      const u = userProfilesMap.get(r.user_id) || (db.users || []).find(usr => usr.id === r.user_id);
       return {
         ...r,
         user_name: r.user_name || u?.name || 'Retailer',
-        user_mobile: r.user_mobile || u?.mobile_number || r.mobile_number
+        user_mobile: r.user_mobile || u?.mobile_number || ''
       };
     });
 

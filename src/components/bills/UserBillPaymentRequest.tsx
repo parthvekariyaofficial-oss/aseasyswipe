@@ -689,6 +689,7 @@ export const UserBillPaymentRequest: React.FC = () => {
                 <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] uppercase tracking-wider font-extrabold text-slate-400">
                   <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Customer & Card</th>
+                  <th className="py-3 px-4">Customer Mobile</th>
                   <th className="py-3 px-4">Bank</th>
                   <th className="py-3 px-4">Bill Amount</th>
                   <th className="py-3 px-4">Charge</th>
@@ -728,6 +729,18 @@ export const UserBillPaymentRequest: React.FC = () => {
                       <p className="text-[11px] font-mono text-indigo-400">
                         XXXX-XXXX-XXXX-{req.card_number.slice(-4)}
                       </p>
+                    </td>
+
+                    {/* Customer Mobile */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      {req.mobile_number ? (
+                        <div className="flex items-center gap-1.5 font-mono text-xs text-slate-200 font-semibold">
+                          <Phone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>+91 {req.mobile_number}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 font-semibold text-slate-300">

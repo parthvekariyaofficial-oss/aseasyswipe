@@ -20,7 +20,8 @@ import {
   DollarSign,
   Calendar,
   RotateCcw,
-  Filter
+  Filter,
+  Phone
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -171,7 +172,13 @@ export const AdminBillRequestsManagement: React.FC = () => {
 
   const copyCard = (card: string, id: string) => {
     navigator.clipboard.writeText(card);
-    setCopiedId(id);
+    setCopiedId(`card_${id}`);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const copyMobile = (mobile: string, id: string) => {
+    navigator.clipboard.writeText(mobile);
+    setCopiedId(`mob_${id}`);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -273,7 +280,7 @@ export const AdminBillRequestsManagement: React.FC = () => {
         req.card_number.includes(q) ||
         req.bank_name.toLowerCase().includes(q) ||
         (req.user_name || '').toLowerCase().includes(q) ||
-        req.mobile_number.includes(q) ||
+        (req.mobile_number || '').includes(q) ||
         (req.user_mobile || '').includes(q);
       if (!matchesSearch) return false;
     }
@@ -577,6 +584,7 @@ export const AdminBillRequestsManagement: React.FC = () => {
                   <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4">Retailer / Merchant</th>
                   <th className="py-3.5 px-4">Customer & Card</th>
+                  <th className="py-3.5 px-4">Customer Mobile</th>
                   <th className="py-3.5 px-4">Bank Name</th>
                   <th className="py-3.5 px-4">Bill Amount</th>
                   <th className="py-3.5 px-4">Slab Charge</th>
@@ -616,7 +624,9 @@ export const AdminBillRequestsManagement: React.FC = () => {
                     {/* Retailer */}
                     <td className="py-4 px-4">
                       <p className="font-bold text-white">{req.user_name || 'Retailer'}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">+91 {req.user_mobile || req.mobile_number}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        {req.user_mobile ? `+91 ${req.user_mobile}` : 'N/A'}
+                      </p>
                     </td>
 
                     {/* Customer & Card */}
@@ -629,9 +639,32 @@ export const AdminBillRequestsManagement: React.FC = () => {
                           className="text-slate-500 hover:text-indigo-300 transition"
                           title="Copy Full Card Number"
                         >
-                          {copiedId === req.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedId === `card_${req.id}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         </button>
                       </div>
+                    </td>
+
+                    {/* Customer Mobile */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      {req.mobile_number ? (
+                        <div className="flex items-center gap-1.5 font-mono text-xs text-slate-200 font-bold">
+                          <Phone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span>+91 {req.mobile_number}</span>
+                          <button
+                            onClick={() => copyMobile(req.mobile_number, req.id)}
+                            className="text-slate-500 hover:text-indigo-300 transition p-0.5 rounded hover:bg-slate-800"
+                            title="Copy Customer Mobile Number"
+                          >
+                            {copiedId === `mob_${req.id}` ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 font-mono text-xs">N/A</span>
+                      )}
                     </td>
 
                     {/* Bank Name */}
