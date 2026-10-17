@@ -61,6 +61,30 @@ export const calculatePayoutCharge = async (amount) => {
   };
 };
 
+// Helper: Check if gateway response or error indicates processing / pending / queued
+export const isPayoutProcessingOrPending = (data, errorMsg) => {
+  const statusStr = String(data?.status || data?.payment_status || '').toLowerCase();
+  const msgStr = String(data?.message || errorMsg || '').toLowerCase();
+
+  const isPendingStatus = [
+    'pending', 'processing', 'in_progress', 'in-progress', 'in_process', 
+    'queued', 'accepted', 'submitted', 'initiated'
+  ].includes(statusStr);
+
+  const isProcessingMessage = 
+    msgStr.includes('currently being processed') ||
+    msgStr.includes('being processed') ||
+    msgStr.includes('processed by the bank') ||
+    msgStr.includes('webhook will be delivered') ||
+    msgStr.includes('in progress') ||
+    msgStr.includes('processing') ||
+    msgStr.includes('pending') ||
+    msgStr.includes('queued') ||
+    msgStr.includes('accepted');
+
+  return isPendingStatus || isProcessingMessage;
+};
+
 // ============================================================================
 // 1. SLABS MANAGEMENT (Admin & Public read for calculate)
 // ============================================================================
@@ -520,7 +544,8 @@ router.post('/transfer', verifyToken, async (req, res) => {
           mobile_number: cleanMobile || undefined,
           transfer_mode: mode,
           client_order_id: clientOrderId,
-          bank_name: bank_name || undefined
+          bank_name: bank_name || undefined,
+          webhook_url: process.env.PAYOUT_WEBHOOK_URL || 'https://aseasyswipe.com/api/payout/webhook'
         },
         {
           headers: {
@@ -532,18 +557,74 @@ router.post('/transfer', verifyToken, async (req, res) => {
         }
       );
 
-      const resData = response.data;
+      const resData = response.data || {};
+      const orderData = resData.data || {};
+      const apiOrderId = orderData.order_id || resData.order_id || null;
+      const utr = orderData.utr || resData.utr || null;
 
-      // Handle Success Response
-      if (resData && (resData.status === 'success' || response.status === 200)) {
-        const orderData = resData.data || {};
-        const utr = orderData.utr || resData.utr || `UTR${Date.now()}`.slice(-12);
-        const apiOrderId = orderData.order_id || resData.order_id || `B2BPO${Date.now()}`;
+      // Handle Processing / Pending Response (HTTP 202 or pending status in body)
+      if (response.status === 202 || isPayoutProcessingOrPending(resData) || isPayoutProcessingOrPending(orderData)) {
+        console.log(`[UsePay Payout Status]: Transfer ${clientOrderId} accepted by bank in PENDING/PROCESSING state.`);
+        newTxn.status = 'pending';
+        newTxn.api_order_id = apiOrderId;
+        if (utr) newTxn.utr = utr;
+        newTxn.api_response = resData;
+        newTxn.failure_reason = resData.message || 'Payout transfer is currently being processed by the bank.';
+        newTxn.refunded_to_wallet = false;
+        newTxn.updated_at = new Date().toISOString();
+        isDeducted = false; // Retain wallet deduction! DO NOT REFUND!
+
+        if (supabase) {
+          try {
+            await supabase
+              .from('payout_transactions')
+              .update({
+                status: 'pending',
+                utr: newTxn.utr,
+                api_order_id: apiOrderId,
+                api_response: resData,
+                failure_reason: newTxn.failure_reason,
+                refunded_to_wallet: false,
+                updated_at: newTxn.updated_at
+              })
+              .eq('id', newTxn.id);
+          } catch (e) {
+            console.warn('Supabase update pending warning:', e.message);
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          status: 'pending',
+          message: resData.message || 'Payout transfer is currently being processed by the bank. Webhook will be delivered upon completion.',
+          data: {
+            order_id: apiOrderId || clientOrderId,
+            client_order_id: clientOrderId,
+            utr: newTxn.utr,
+            amount: numAmount,
+            slab_charge: charge_amount,
+            total_deducted: total_deducted,
+            beneficiary_name: cleanBeneficiary,
+            account_number: cleanAccount,
+            ifsc_code: cleanIfsc,
+            transfer_mode: mode,
+            remaining_wallet_balance: newWalletBalance,
+            status: 'pending'
+          }
+        });
+      }
+
+      // Handle Immediate Success Response
+      if (resData.status === 'success' || response.status === 200) {
+        const finalUtr = utr || `UTR${Date.now()}`.slice(-12);
+        const finalOrderId = apiOrderId || `B2BPO${Date.now()}`;
 
         newTxn.status = 'success';
-        newTxn.utr = utr;
-        newTxn.api_order_id = apiOrderId;
+        newTxn.utr = finalUtr;
+        newTxn.api_order_id = finalOrderId;
         newTxn.api_response = resData;
+        newTxn.failure_reason = null;
+        newTxn.refunded_to_wallet = false;
         newTxn.updated_at = new Date().toISOString();
         isDeducted = false; // Successfully processed, do not refund
 
@@ -553,22 +634,51 @@ router.post('/transfer', verifyToken, async (req, res) => {
               .from('payout_transactions')
               .update({
                 status: 'success',
-                utr,
-                api_order_id: apiOrderId,
+                utr: finalUtr,
+                api_order_id: finalOrderId,
                 api_response: resData,
+                failure_reason: null,
+                refunded_to_wallet: false,
                 updated_at: newTxn.updated_at
               })
               .eq('id', newTxn.id);
           } catch {}
         }
 
+        // Auto-save/update into saved beneficiaries
+        try {
+          const autoBen = {
+            id: `ben_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            user_id: userProfile.id,
+            account_number: cleanAccount,
+            ifsc_code: cleanIfsc,
+            beneficiary_name: cleanBeneficiary,
+            bank_name: bank_name || '',
+            is_verified: true,
+            verified_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          if (!db.payout_beneficiaries) db.payout_beneficiaries = [];
+          const bIdx = db.payout_beneficiaries.findIndex(b => b.user_id === userProfile.id && b.account_number === cleanAccount && b.ifsc_code === cleanIfsc);
+          if (bIdx !== -1) {
+            db.payout_beneficiaries[bIdx] = { ...db.payout_beneficiaries[bIdx], ...autoBen, id: db.payout_beneficiaries[bIdx].id };
+          } else {
+            db.payout_beneficiaries.unshift(autoBen);
+          }
+          if (supabase) {
+            await supabase.from('payout_beneficiaries').upsert([autoBen]);
+          }
+        } catch {}
+
         return res.status(200).json({
           success: true,
+          status: 'success',
           message: resData.message || 'Payout transfer completed successfully',
           data: {
-            order_id: apiOrderId,
+            order_id: finalOrderId,
             client_order_id: clientOrderId,
-            utr,
+            utr: finalUtr,
             amount: numAmount,
             slab_charge: charge_amount,
             total_deducted: total_deducted,
@@ -589,7 +699,72 @@ router.post('/transfer', verifyToken, async (req, res) => {
       const errorPayload = apiErr.response?.data || {};
       const failureReason = errorPayload.message || apiErr.message || 'Upstream bank payout transfer failed';
 
-      // 10. STRICT SINGLE AUTO-REFUND TO USER WALLET ON UPSTREAM FAILURE
+      // STRICT GUARD: CHECK IF THIS IS AN IN-PROGRESS / PENDING STATE OR GATEWAY TIMEOUT
+      const isPending = 
+        apiErr.response?.status === 202 ||
+        isPayoutProcessingOrPending(errorPayload, failureReason) ||
+        apiErr.code === 'ECONNABORTED' ||
+        String(apiErr.message || '').toLowerCase().includes('timeout');
+
+      if (isPending) {
+        // STRICT RULE: DO NOT REFUND! Bank is processing this transfer.
+        console.log(`[UsePay Payout In-Progress Guard]: Transfer ${clientOrderId} is being processed by bank. Retaining wallet deduction and setting status to pending.`);
+        isDeducted = false; // Do not auto-refund
+
+        const apiOrderId = errorPayload.order_id || errorPayload.data?.order_id || null;
+        const utr = errorPayload.utr || errorPayload.data?.utr || null;
+
+        if (newTxn) {
+          newTxn.status = 'pending';
+          newTxn.refunded_to_wallet = false;
+          newTxn.failure_reason = failureReason;
+          if (apiOrderId) newTxn.api_order_id = apiOrderId;
+          if (utr) newTxn.utr = utr;
+          newTxn.api_response = errorPayload;
+          newTxn.updated_at = new Date().toISOString();
+
+          if (supabase) {
+            try {
+              await supabase
+                .from('payout_transactions')
+                .update({
+                  status: 'pending',
+                  refunded_to_wallet: false,
+                  failure_reason: failureReason,
+                  api_order_id: newTxn.api_order_id,
+                  utr: newTxn.utr,
+                  api_response: errorPayload,
+                  updated_at: newTxn.updated_at
+                })
+                .eq('id', newTxn.id);
+            } catch (e) {
+              console.warn('Supabase update pending warning:', e);
+            }
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          status: 'pending',
+          message: failureReason || 'Payout transfer is currently being processed by the bank. Webhook will be delivered automatically upon completion.',
+          data: {
+            order_id: newTxn?.api_order_id || clientOrderId,
+            client_order_id: clientOrderId,
+            utr: newTxn?.utr || null,
+            amount: numAmount,
+            slab_charge: charge_amount,
+            total_deducted: total_deducted,
+            beneficiary_name: cleanBeneficiary,
+            account_number: cleanAccount,
+            ifsc_code: cleanIfsc,
+            transfer_mode: mode,
+            remaining_wallet_balance: newWalletBalance,
+            status: 'pending'
+          }
+        });
+      }
+
+      // ONLY IF IT IS A DEFINITIVE HARD FAILURE (not pending/processing):
       let refundedBalance = currentWalletBalance;
       if (isDeducted && !hasRefunded) {
         hasRefunded = true;
@@ -712,8 +887,8 @@ router.get('/status/:order_id', verifyToken, async (req, res) => {
 
     if (apiKey && secretKey) {
       try {
-        const targetId = localTxn?.api_order_id || order_id;
-        const response = await axios.get(`${baseUrl}/payout/status/${targetId}`, {
+        const targetId = localTxn?.api_order_id || localTxn?.client_order_id || order_id;
+        const response = await axios.get(`${baseUrl}/payout/status/${encodeURIComponent(targetId)}`, {
           headers: {
             'x-api-key': apiKey,
             'x-secret-key': secretKey,
@@ -722,20 +897,67 @@ router.get('/status/:order_id', verifyToken, async (req, res) => {
           timeout: 10000
         });
 
-        if (response.data && response.data.status === 'success') {
-          const liveData = response.data.data;
+        if (response.data && (response.data.status === 'success' || response.status === 200)) {
+          const liveData = response.data.data || response.data;
+          const liveStatus = String(liveData.status || response.data.status || '').toLowerCase();
+          const liveUtr = liveData.utr || response.data.utr || null;
+          const liveApiOrderId = liveData.order_id || response.data.order_id || null;
 
-          // Update local status if changed
-          if (localTxn && liveData) {
-            localTxn.status = liveData.status || localTxn.status;
-            if (liveData.utr) localTxn.utr = liveData.utr;
+          // If localTxn was not found initially, attempt matching by liveData's client_order_id or order_id
+          if (!localTxn && supabase) {
+            try {
+              const queryIds = [liveData.client_order_id, liveApiOrderId, order_id].filter(Boolean);
+              if (queryIds.length > 0) {
+                const orClause = queryIds.map(id => `client_order_id.eq.${id},api_order_id.eq.${id}`).join(',');
+                const { data: matched } = await supabase
+                  .from('payout_transactions')
+                  .select('*')
+                  .or(orClause)
+                  .maybeSingle();
+                if (matched) localTxn = matched;
+              }
+            } catch (matchErr) {
+              console.warn('Matching localTxn warning:', matchErr.message);
+            }
+          }
+
+          if (localTxn) {
+            if (liveStatus === 'success' || liveStatus === 'completed') {
+              localTxn.status = 'success';
+              if (liveUtr) localTxn.utr = liveUtr;
+              if (liveApiOrderId) localTxn.api_order_id = liveApiOrderId;
+              localTxn.failure_reason = null;
+              localTxn.refunded_to_wallet = false;
+            } else if (liveStatus === 'failed' || liveStatus === 'rejected') {
+              localTxn.status = 'failed';
+              // If not refunded, refund once
+              if (!localTxn.refunded_to_wallet) {
+                localTxn.refunded_to_wallet = true;
+                const refundAmt = Number(localTxn.total_deducted || (localTxn.amount + localTxn.slab_charge));
+                if (supabase) {
+                  const { data: userRec } = await supabase.from('users_profiles').select('id, wallet_balance').eq('id', localTxn.user_id).single();
+                  if (userRec) {
+                    const newBal = Number((Number(userRec.wallet_balance || 0) + refundAmt).toFixed(2));
+                    await supabase.from('users_profiles').update({ wallet_balance: newBal, updated_at: new Date().toISOString() }).eq('id', userRec.id);
+                  }
+                }
+              }
+            } else if (isPayoutProcessingOrPending(liveData) || isPayoutProcessingOrPending(response.data)) {
+              localTxn.status = 'pending';
+              localTxn.refunded_to_wallet = false;
+            }
+
+            localTxn.updated_at = new Date().toISOString();
             if (supabase) {
               await supabase
                 .from('payout_transactions')
                 .update({
                   status: localTxn.status,
-                  utr: localTxn.utr,
-                  updated_at: new Date().toISOString()
+                  utr: localTxn.utr || null,
+                  api_order_id: localTxn.api_order_id || null,
+                  failure_reason: localTxn.failure_reason,
+                  refunded_to_wallet: localTxn.refunded_to_wallet,
+                  updated_at: localTxn.updated_at
                 })
                 .eq('id', localTxn.id);
             }
@@ -744,11 +966,29 @@ router.get('/status/:order_id', verifyToken, async (req, res) => {
           return res.status(200).json({
             success: true,
             data: liveData,
-            localRecord: localTxn
+            localRecord: localTxn,
+            message: `Bank status: ${liveStatus.toUpperCase()}${liveUtr ? ` (UTR: ${liveUtr})` : ''}`
           });
         }
       } catch (apiErr) {
-        console.warn('UsePay Status Check API error fallback to local:', apiErr.message);
+        console.warn('UsePay Status Check API error:', apiErr.message, apiErr.response?.data);
+        const errData = apiErr.response?.data;
+        if (errData && (errData.data || isPayoutProcessingOrPending(errData.data, errData.message))) {
+          const liveData = errData.data || {};
+          if (localTxn && isPayoutProcessingOrPending(liveData, errData.message)) {
+            localTxn.status = 'pending';
+            localTxn.failure_reason = errData.message;
+            if (supabase) {
+              await supabase.from('payout_transactions').update({ status: 'pending', failure_reason: errData.message }).eq('id', localTxn.id);
+            }
+          }
+          return res.status(200).json({
+            success: true,
+            data: liveData,
+            localRecord: localTxn,
+            message: errData.message || 'Payout transfer is currently being processed by the bank.'
+          });
+        }
       }
     }
 
@@ -766,6 +1006,690 @@ router.get('/status/:order_id', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('Payout Status Check Error:', err);
     return res.status(500).json({ success: false, message: 'Failed to query payout status' });
+  }
+});
+
+// POST /api/payout/verify-account - Bank Account Validation (Penny Drop) with Dynamic Fee & Wallet Deduction
+router.post('/verify-account', verifyToken, async (req, res) => {
+  try {
+    const { account_number, ifsc_code, client_reference_id } = req.body;
+    const cleanAccount = String(account_number || '').trim();
+    const cleanIfsc = String(ifsc_code || '').trim().toUpperCase();
+
+    if (!cleanAccount || cleanAccount.length < 8 || cleanAccount.length > 22) {
+      return res.status(400).json({ success: false, message: 'Invalid Account Number (8 to 22 digits required)' });
+    }
+    if (!cleanIfsc || cleanIfsc.length !== 11) {
+      return res.status(400).json({ success: false, message: 'Invalid IFSC Code (11 alphanumeric characters required)' });
+    }
+
+    if (!db.system_settings) {
+      db.system_settings = {
+        payout_verification_charge: 5.00,
+        payout_verification_enabled: true
+      };
+    }
+
+    if (db.system_settings.payout_verification_enabled === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bank account verification service is currently disabled by administrator.'
+      });
+    }
+
+    const verificationCharge = Number(db.system_settings.payout_verification_charge !== undefined ? db.system_settings.payout_verification_charge : 5.00);
+
+    // 1. Fetch user to check wallet balance
+    const userId = req.user.id;
+    let userProfile = (db.users || []).find(u => u.id === userId);
+    if (!userProfile && supabase) {
+      try {
+        const { data } = await supabase.from('users_profiles').select('*').eq('id', userId).single();
+        if (data) userProfile = data;
+      } catch {}
+    }
+
+    if (!userProfile) {
+      return res.status(404).json({ success: false, message: 'User profile not found.' });
+    }
+
+    const currentBalance = Number(userProfile.wallet_balance || 0);
+    if (currentBalance < verificationCharge) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient wallet balance to verify bank account. Required ₹${verificationCharge.toFixed(2)}, Available ₹${currentBalance.toFixed(2)}.`
+      });
+    }
+
+    const baseUrl = (process.env.USEPAY_BASE_URL || 'https://www.usepay.in/api/v1/b2b').replace(/\/$/, '');
+    const apiKey = process.env.USEPAY_API_KEY || '';
+    const secretKey = process.env.USEPAY_SECRET_KEY || '';
+
+    let liveData = null;
+
+    if (!apiKey || !secretKey) {
+      // Mock Sandbox Response
+      liveData = {
+        account_number: cleanAccount,
+        ifsc_code: cleanIfsc,
+        name_at_bank: 'RAMESHBHAI PATEL',
+        bank_name: 'HDFC BANK',
+        utr: `VFY${Date.now()}`.slice(-12),
+        reference_id: `B2BVFY${Date.now()}`,
+        client_reference_id: client_reference_id || `VFY_${Date.now()}`,
+        account_status: 'ACTIVE',
+        city: 'AHMEDABAD',
+        branch: 'NAVRANGPURA',
+        charge_deducted: 3.00,
+        status: 'success'
+      };
+    } else {
+      try {
+        const response = await axios.post(
+          `${baseUrl}/payout/verify-account`,
+          {
+            account_number: cleanAccount,
+            ifsc_code: cleanIfsc,
+            client_reference_id: client_reference_id || `VFY_${Date.now()}`
+          },
+          {
+            headers: {
+              'x-api-key': apiKey,
+              'x-secret-key': secretKey,
+              'Content-Type': 'application/json'
+            },
+            timeout: 20000
+          }
+        );
+
+        if (response.data && (response.data.status === 'success' || response.status === 200)) {
+          liveData = response.data.data || response.data;
+        } else {
+          throw new Error(response.data?.message || 'Verification unsuccessful at bank gateway.');
+        }
+      } catch (apiErr) {
+        const errPayload = apiErr.response?.data || {};
+        const failMsg = errPayload.message || apiErr.message || 'Bank account verification failed. Invalid account number or inactive bank account.';
+
+        // Record failed attempt in history with 0 charge
+        const failedRecord = {
+          id: `pver_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          user_id: userProfile.id,
+          user_name: userProfile.name || '',
+          user_mobile: userProfile.mobile_number || '',
+          account_number: cleanAccount,
+          ifsc_code: cleanIfsc,
+          name_at_bank: null,
+          bank_name: null,
+          branch: null,
+          city: null,
+          utr: null,
+          reference_id: null,
+          client_reference_id: client_reference_id || `VFY_${Date.now()}`,
+          account_status: 'FAILED',
+          charge_deducted: 0.00,
+          gateway_charge: 0.00,
+          status: 'failed',
+          failure_reason: failMsg,
+          created_at: new Date().toISOString()
+        };
+
+        if (!db.payout_verifications) db.payout_verifications = [];
+        db.payout_verifications.unshift(failedRecord);
+
+        if (supabase) {
+          try {
+            await supabase.from('payout_verifications').insert([failedRecord]);
+          } catch {}
+        }
+
+        return res.status(apiErr.response?.status || 400).json({
+          status: 'failed',
+          success: false,
+          message: failMsg,
+          data: {
+            account_number: cleanAccount,
+            ifsc_code: cleanIfsc,
+            charge_deducted: 0.00,
+            status: 'failed'
+          }
+        });
+      }
+    }
+
+    // SUCCESSFUL VERIFICATION: Deduct fee from user wallet!
+    const newWalletBalance = Number((currentBalance - verificationCharge).toFixed(2));
+    userProfile.wallet_balance = newWalletBalance;
+    userProfile.updated_at = new Date().toISOString();
+
+    const memUserIdx = (db.users || []).findIndex(u => u.id === userProfile.id);
+    if (memUserIdx !== -1) {
+      db.users[memUserIdx].wallet_balance = newWalletBalance;
+    }
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('users_profiles')
+          .update({ wallet_balance: newWalletBalance, updated_at: new Date().toISOString() })
+          .eq('id', userProfile.id);
+      } catch (e) {
+        console.warn('Supabase wallet deduction for verification warning:', e.message);
+      }
+    }
+
+    // Save into wallet_ledger passbook
+    if (!db.wallet_ledger) db.wallet_ledger = [];
+    const ledgerEntry = {
+      id: `wled_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user_id: userProfile.id,
+      amount: verificationCharge,
+      type: 'DEBIT',
+      description: `Bank Account Penny Drop Verification Fee - A/C ${cleanAccount.slice(-4)} (${liveData.bank_name || cleanIfsc})`,
+      balance_after: newWalletBalance,
+      reference_id: liveData.utr || liveData.reference_id || `VFY_${Date.now()}`,
+      status: 'SUCCESS',
+      created_at: new Date().toISOString()
+    };
+    db.wallet_ledger.unshift(ledgerEntry);
+    if (supabase) {
+      try {
+        await supabase.from('wallet_ledger').insert([ledgerEntry]);
+      } catch {}
+    }
+
+    // Auto-save into Saved Beneficiaries
+    const benName = liveData.name_at_bank || liveData.account_name || 'VERIFIED BENEFICIARY';
+    const benRecord = {
+      id: `ben_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user_id: userProfile.id,
+      account_number: cleanAccount,
+      ifsc_code: cleanIfsc,
+      beneficiary_name: benName,
+      bank_name: liveData.bank_name || '',
+      branch: liveData.branch || '',
+      city: liveData.city || '',
+      is_verified: true,
+      verified_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (!db.payout_beneficiaries) db.payout_beneficiaries = [];
+    const existingIdx = db.payout_beneficiaries.findIndex(
+      b => b.user_id === userProfile.id && b.account_number === cleanAccount && b.ifsc_code === cleanIfsc
+    );
+    if (existingIdx !== -1) {
+      db.payout_beneficiaries[existingIdx] = {
+        ...db.payout_beneficiaries[existingIdx],
+        ...benRecord,
+        id: db.payout_beneficiaries[existingIdx].id
+      };
+    } else {
+      db.payout_beneficiaries.unshift(benRecord);
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('payout_beneficiaries').upsert([benRecord]);
+      } catch {}
+    }
+
+    // Record into payout_verifications history
+    const verRecord = {
+      id: `pver_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user_id: userProfile.id,
+      user_name: userProfile.name || '',
+      user_mobile: userProfile.mobile_number || '',
+      account_number: cleanAccount,
+      ifsc_code: cleanIfsc,
+      name_at_bank: benName,
+      bank_name: liveData.bank_name || '',
+      branch: liveData.branch || '',
+      city: liveData.city || '',
+      utr: liveData.utr || null,
+      reference_id: liveData.reference_id || null,
+      client_reference_id: client_reference_id || `VFY_${Date.now()}`,
+      account_status: liveData.account_status || 'ACTIVE',
+      charge_deducted: verificationCharge,
+      gateway_charge: Number(liveData.charge_deducted || 3.00),
+      status: 'success',
+      failure_reason: null,
+      created_at: new Date().toISOString()
+    };
+
+    if (!db.payout_verifications) db.payout_verifications = [];
+    db.payout_verifications.unshift(verRecord);
+    if (supabase) {
+      try {
+        await supabase.from('payout_verifications').insert([verRecord]);
+      } catch {}
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      success: true,
+      message: 'Bank account verified successfully',
+      data: {
+        ...liveData,
+        name_at_bank: benName,
+        charge_deducted: verificationCharge,
+        remaining_wallet_balance: newWalletBalance,
+        beneficiary: benRecord
+      }
+    });
+
+  } catch (err) {
+    console.error('Verify Account Error:', err);
+    return res.status(500).json({
+      status: 'failed',
+      success: false,
+      message: err.message || 'Internal server error while verifying bank account'
+    });
+  }
+});
+
+// ============================================================================
+// 4B. SAVED BENEFICIARIES MANAGEMENT
+// ============================================================================
+
+// GET /api/payout/beneficiaries - Get saved beneficiaries for user
+router.get('/beneficiaries', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let list = [];
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('payout_beneficiaries')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          list = data;
+        }
+      } catch {}
+    }
+    if (list.length === 0) {
+      list = (db.payout_beneficiaries || []).filter(b => b.user_id === userId);
+    }
+    return res.status(200).json({ success: true, beneficiaries: list });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch beneficiaries' });
+  }
+});
+
+// POST /api/payout/beneficiaries - Save or update beneficiary
+router.post('/beneficiaries', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { account_number, ifsc_code, beneficiary_name, bank_name, branch, city } = req.body;
+    const cleanAccount = String(account_number || '').trim();
+    const cleanIfsc = String(ifsc_code || '').trim().toUpperCase();
+    const cleanName = String(beneficiary_name || '').trim();
+
+    if (!cleanAccount || !cleanIfsc || !cleanName) {
+      return res.status(400).json({ success: false, message: 'Account number, IFSC, and Beneficiary Name are required.' });
+    }
+
+    const benRecord = {
+      id: `ben_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user_id: userId,
+      account_number: cleanAccount,
+      ifsc_code: cleanIfsc,
+      beneficiary_name: cleanName,
+      bank_name: bank_name || '',
+      branch: branch || '',
+      city: city || '',
+      is_verified: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (!db.payout_beneficiaries) db.payout_beneficiaries = [];
+    const idx = db.payout_beneficiaries.findIndex(b => b.user_id === userId && b.account_number === cleanAccount && b.ifsc_code === cleanIfsc);
+    if (idx !== -1) {
+      db.payout_beneficiaries[idx] = { ...db.payout_beneficiaries[idx], ...benRecord, id: db.payout_beneficiaries[idx].id };
+    } else {
+      db.payout_beneficiaries.unshift(benRecord);
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('payout_beneficiaries').upsert([benRecord]);
+      } catch {}
+    }
+
+    return res.status(200).json({ success: true, message: 'Beneficiary saved successfully', beneficiary: benRecord });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to save beneficiary' });
+  }
+});
+
+// DELETE /api/payout/beneficiaries/:id - Delete a saved beneficiary
+router.delete('/beneficiaries/:id', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    if (db.payout_beneficiaries) {
+      db.payout_beneficiaries = db.payout_beneficiaries.filter(b => !(b.id === id && b.user_id === userId));
+    }
+
+    if (supabase) {
+      try {
+        await supabase.from('payout_beneficiaries').delete().eq('id', id).eq('user_id', userId);
+      } catch {}
+    }
+
+    return res.status(200).json({ success: true, message: 'Beneficiary removed successfully' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to delete beneficiary' });
+  }
+});
+
+// ============================================================================
+// 4C. PENNY DROP VERIFICATIONS HISTORY ENDPOINTS
+// ============================================================================
+
+// GET /api/payout/verifications/user - Fetch verification history for user
+router.get('/verifications/user', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let list = [];
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('payout_verifications')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          list = data;
+        }
+      } catch {}
+    }
+    if (list.length === 0) {
+      list = (db.payout_verifications || []).filter(v => v.user_id === userId);
+    }
+    return res.status(200).json({ success: true, verifications: list });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch verification history' });
+  }
+});
+
+// GET /api/payout/verifications/admin - Fetch all verification history for Admin
+router.get('/verifications/admin', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    let list = [];
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('payout_verifications')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          list = data;
+        }
+      } catch {}
+    }
+    if (list.length === 0) {
+      list = db.payout_verifications || [];
+    }
+
+    // Calculate Platform Stats
+    const totalVerifications = list.length;
+    const successCount = list.filter(v => v.status === 'success').length;
+    const failedCount = list.filter(v => v.status === 'failed').length;
+    const totalCollected = list.reduce((acc, curr) => acc + Number(curr.charge_deducted || 0), 0);
+    const totalGatewayCost = list.reduce((acc, curr) => acc + (curr.status === 'success' ? Number(curr.gateway_charge || 3.00) : 0), 0);
+    const netProfit = Number((totalCollected - totalGatewayCost).toFixed(2));
+
+    return res.status(200).json({
+      success: true,
+      verifications: list,
+      stats: {
+        total_verifications: totalVerifications,
+        success_count: successCount,
+        failed_count: failedCount,
+        total_collected: totalCollected,
+        total_gateway_cost: totalGatewayCost,
+        net_profit: netProfit
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch admin verification records' });
+  }
+});
+
+// GET /api/payout/webhook - Verification / Health check for gateway webhook URL
+router.get('/webhook', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'AsEasySwipe Payout Webhook endpoint is active and listening',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// POST /api/payout/webhook - Public Webhook for UsePay Payout Status Callbacks
+router.post('/webhook', async (req, res) => {
+  try {
+    console.log('[UsePay Payout Webhook Received]:', JSON.stringify(req.body, null, 2));
+    const payload = req.body || {};
+    const orderData = payload.data || {};
+    
+    const clientOrderId = payload.client_order_id || orderData.client_order_id || payload.order_id || orderData.order_id;
+    const apiOrderId = payload.order_id || orderData.order_id || null;
+    const rawStatus = String(payload.status || orderData.status || payload.payment_status || '').toLowerCase();
+    const utr = payload.utr || orderData.utr || payload.rrn || orderData.rrn || null;
+    const msg = payload.message || orderData.message || payload.failure_reason || null;
+
+    if (!clientOrderId) {
+      return res.status(400).json({ success: false, message: 'Missing client_order_id in webhook payload' });
+    }
+
+    let txn = (db.payout_transactions || []).find(
+      t => t.client_order_id === clientOrderId || t.api_order_id === clientOrderId || t.id === clientOrderId || (apiOrderId && (t.api_order_id === apiOrderId || t.client_order_id === apiOrderId))
+    );
+
+    if (!txn && supabase) {
+      try {
+        const { data } = await supabase
+          .from('payout_transactions')
+          .select('*')
+          .or(`client_order_id.eq.${clientOrderId},api_order_id.eq.${clientOrderId},id.eq.${clientOrderId}`)
+          .maybeSingle();
+        if (data) txn = data;
+      } catch (e) {
+        console.warn('Supabase fetch txn in webhook warning:', e);
+      }
+    }
+
+    if (!txn) {
+      console.warn(`[Payout Webhook]: Transaction not found for order ${clientOrderId}`);
+      return res.status(200).json({ success: true, message: 'Webhook received but local order not found' });
+    }
+
+    const isSuccess = rawStatus === 'success' || rawStatus === 'completed';
+    const isFailed = rawStatus === 'failed' || rawStatus === 'rejected' || rawStatus === 'reversed';
+
+    if (isSuccess) {
+      console.log(`[Payout Webhook]: Payout ${clientOrderId} confirmed SUCCESS with UTR ${utr}`);
+      txn.status = 'success';
+      if (utr) txn.utr = utr;
+      if (apiOrderId) txn.api_order_id = apiOrderId;
+      txn.failure_reason = null;
+      txn.refunded_to_wallet = false;
+      txn.updated_at = new Date().toISOString();
+
+      if (supabase) {
+        try {
+          await supabase
+            .from('payout_transactions')
+            .update({
+              status: 'success',
+              utr: txn.utr,
+              api_order_id: txn.api_order_id,
+              failure_reason: null,
+              refunded_to_wallet: false,
+              updated_at: txn.updated_at
+            })
+            .eq('id', txn.id);
+        } catch (e) {
+          console.error('Webhook Supabase update error:', e);
+        }
+      }
+    } else if (isFailed) {
+      console.log(`[Payout Webhook]: Payout ${clientOrderId} confirmed FAILED. Processing refund if not refunded.`);
+      // Only refund if not already refunded
+      if (!txn.refunded_to_wallet) {
+        txn.refunded_to_wallet = true;
+        const refundAmt = Number(txn.total_deducted || (txn.amount + txn.slab_charge));
+
+        if (supabase) {
+          try {
+            const { data: userRecord } = await supabase
+              .from('users_profiles')
+              .select('id, wallet_balance')
+              .eq('id', txn.user_id)
+              .single();
+
+            if (userRecord) {
+              const currentBal = Number(userRecord.wallet_balance || 0);
+              const newBal = Number((currentBal + refundAmt).toFixed(2));
+              await supabase
+                .from('users_profiles')
+                .update({ wallet_balance: newBal, updated_at: new Date().toISOString() })
+                .eq('id', userRecord.id);
+
+              const memUser = (db.users || []).find(u => u.id === txn.user_id);
+              if (memUser) memUser.wallet_balance = newBal;
+              console.log(`[Payout Webhook]: Refunded ₹${refundAmt} to user ${txn.user_id}`);
+            }
+          } catch (e) {
+            console.error('Webhook refund error:', e);
+          }
+        }
+      }
+
+      txn.status = 'failed';
+      txn.failure_reason = msg || 'Bank payout transfer failed';
+      txn.updated_at = new Date().toISOString();
+
+      if (supabase) {
+        try {
+          await supabase
+            .from('payout_transactions')
+            .update({
+              status: 'failed',
+              refunded_to_wallet: true,
+              failure_reason: txn.failure_reason,
+              updated_at: txn.updated_at
+            })
+            .eq('id', txn.id);
+        } catch (e) {
+          console.error('Webhook Supabase fail update error:', e);
+        }
+      }
+    }
+
+    return res.status(200).json({ success: true, message: 'Payout webhook processed successfully' });
+  } catch (err) {
+    console.error('[Payout Webhook Critical Error]:', err);
+    return res.status(500).json({ success: false, message: 'Webhook processing exception' });
+  }
+});
+
+// POST /api/payout/reconcile/:id - Admin Manual Reconciliation
+router.post('/reconcile/:id', verifyToken, requireRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, utr, remarks, adjust_wallet } = req.body;
+
+    let txn = (db.payout_transactions || []).find(t => t.id === id || t.client_order_id === id);
+    if (!txn && supabase) {
+      const { data } = await supabase.from('payout_transactions').select('*').or(`id.eq.${id},client_order_id.eq.${id}`).maybeSingle();
+      if (data) txn = data;
+    }
+
+    if (!txn) {
+      return res.status(404).json({ success: false, message: 'Payout transaction not found' });
+    }
+
+    if (action === 'mark_success') {
+      const finalUtr = utr || txn.utr || `MANUAL_${Date.now()}`;
+      const wasRefunded = Boolean(txn.refunded_to_wallet);
+
+      // If it was previously refunded to wallet by mistake, adjust wallet balance back
+      if (wasRefunded && adjust_wallet !== false) {
+        const deductAmt = Number(txn.total_deducted || (txn.amount + txn.slab_charge));
+        if (supabase) {
+          const { data: userRec } = await supabase.from('users_profiles').select('id, wallet_balance').eq('id', txn.user_id).single();
+          if (userRec) {
+            const currentBal = Number(userRec.wallet_balance || 0);
+            const adjustedBal = Number((currentBal - deductAmt).toFixed(2));
+            await supabase.from('users_profiles').update({ wallet_balance: adjustedBal, updated_at: new Date().toISOString() }).eq('id', userRec.id);
+            const memUser = (db.users || []).find(u => u.id === txn.user_id);
+            if (memUser) memUser.wallet_balance = adjustedBal;
+            console.log(`[Admin Reconcile]: Re-debited ₹${deductAmt} from User ${txn.user_id} due to confirmed bank success.`);
+          }
+        }
+      }
+
+      txn.status = 'success';
+      txn.utr = finalUtr;
+      txn.failure_reason = null;
+      txn.refunded_to_wallet = false;
+      txn.updated_at = new Date().toISOString();
+
+      if (supabase) {
+        await supabase.from('payout_transactions').update({
+          status: 'success',
+          utr: finalUtr,
+          failure_reason: null,
+          refunded_to_wallet: false,
+          updated_at: txn.updated_at
+        }).eq('id', txn.id);
+      }
+
+      return res.status(200).json({ success: true, message: 'Payout transaction marked as SUCCESS!', transaction: txn });
+    } else if (action === 'mark_failed') {
+      const shouldRefund = !txn.refunded_to_wallet;
+      if (shouldRefund) {
+        const refundAmt = Number(txn.total_deducted || (txn.amount + txn.slab_charge));
+        if (supabase) {
+          const { data: userRec } = await supabase.from('users_profiles').select('id, wallet_balance').eq('id', txn.user_id).single();
+          if (userRec) {
+            const currentBal = Number(userRec.wallet_balance || 0);
+            const refundedBal = Number((currentBal + refundAmt).toFixed(2));
+            await supabase.from('users_profiles').update({ wallet_balance: refundedBal, updated_at: new Date().toISOString() }).eq('id', userRec.id);
+            const memUser = (db.users || []).find(u => u.id === txn.user_id);
+            if (memUser) memUser.wallet_balance = refundedBal;
+          }
+        }
+      }
+
+      txn.status = 'failed';
+      txn.refunded_to_wallet = true;
+      txn.failure_reason = remarks || 'Marked failed by administrator';
+      txn.updated_at = new Date().toISOString();
+
+      if (supabase) {
+        await supabase.from('payout_transactions').update({
+          status: 'failed',
+          refunded_to_wallet: true,
+          failure_reason: txn.failure_reason,
+          updated_at: txn.updated_at
+        }).eq('id', txn.id);
+      }
+
+      return res.status(200).json({ success: true, message: 'Payout transaction marked as FAILED and refunded.', transaction: txn });
+    }
+
+    return res.status(400).json({ success: false, message: 'Invalid action. Must be mark_success or mark_failed.' });
+  } catch (err) {
+    console.error('Reconcile error:', err);
+    return res.status(500).json({ success: false, message: 'Reconciliation failed: ' + err.message });
   }
 });
 
@@ -859,7 +1783,9 @@ router.get('/settings', verifyToken, async (req, res) => {
     return res.status(200).json({
       success: true,
       settings: {
-        instant_payout_enabled: db.system_settings.instant_payout_enabled !== false
+        instant_payout_enabled: db.system_settings.instant_payout_enabled !== false,
+        payout_verification_charge: Number(db.system_settings.payout_verification_charge !== undefined ? db.system_settings.payout_verification_charge : 5.00),
+        payout_verification_enabled: db.system_settings.payout_verification_enabled !== false
       }
     });
   } catch (error) {
@@ -869,7 +1795,7 @@ router.get('/settings', verifyToken, async (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// POST /api/payout/settings (Admin Only - Update Instant Payout Toggle)
+// POST /api/payout/settings (Admin Only - Update Instant Payout & Verification Settings)
 // -----------------------------------------------------------------------------
 router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) => {
   try {
@@ -878,13 +1804,21 @@ router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) 
         user_qr_visible: true,
         qr_request_section_enabled: true,
         live_bill_pay_enabled: true,
-        instant_payout_enabled: true
+        instant_payout_enabled: true,
+        payout_verification_charge: 5.00,
+        payout_verification_enabled: true
       };
     }
 
-    const { instant_payout_enabled } = req.body;
+    const { instant_payout_enabled, payout_verification_charge, payout_verification_enabled } = req.body;
     if (instant_payout_enabled !== undefined) {
       db.system_settings.instant_payout_enabled = Boolean(instant_payout_enabled);
+    }
+    if (payout_verification_charge !== undefined) {
+      db.system_settings.payout_verification_charge = Math.max(0, parseFloat(payout_verification_charge) || 0);
+    }
+    if (payout_verification_enabled !== undefined) {
+      db.system_settings.payout_verification_enabled = Boolean(payout_verification_enabled);
     }
 
     if (supabase) {
@@ -903,9 +1837,11 @@ router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) 
 
     return res.status(200).json({
       success: true,
-      message: `Instant Payout service ${db.system_settings.instant_payout_enabled ? 'enabled' : 'disabled'} successfully.`,
+      message: 'Payout and Verification settings updated successfully.',
       settings: {
-        instant_payout_enabled: db.system_settings.instant_payout_enabled
+        instant_payout_enabled: db.system_settings.instant_payout_enabled,
+        payout_verification_charge: db.system_settings.payout_verification_charge,
+        payout_verification_enabled: db.system_settings.payout_verification_enabled
       }
     });
   } catch (error) {

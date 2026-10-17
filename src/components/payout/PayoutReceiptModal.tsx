@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { PayoutTransaction } from '../../types/payout';
 import {
   Printer, X, CheckCircle2, ShieldCheck, ArrowRightLeft,
-  Building2, User, Copy, Check, Hash, Calendar, Wallet
+  Building2, User, Copy, Check, Hash, Calendar, Wallet, Clock
 } from 'lucide-react';
 
 interface PayoutReceiptModalProps {
@@ -90,6 +90,7 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
   };
 
   const isSuccess = transaction.status === 'success';
+  const isPending = transaction.status === 'pending';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
@@ -98,7 +99,13 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
         {/* Top Header */}
         <div className="flex items-center justify-between p-5 bg-slate-950 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-xl ${isSuccess ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+            <div className={`p-2 rounded-xl ${
+              isSuccess 
+                ? 'bg-emerald-500/20 text-emerald-400' 
+                : isPending 
+                ? 'bg-amber-500/20 text-amber-400' 
+                : 'bg-rose-500/20 text-rose-400'
+            }`}>
               <ArrowRightLeft className="w-5 h-5" />
             </div>
             <div>
@@ -129,14 +136,14 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
 
             <button
               onClick={handlePrint}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-colors"
+              className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-colors cursor-pointer"
               title="Print Receipt"
             >
               <Printer className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -155,12 +162,14 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
               <p className="text-[11px] text-slate-400">NPCI IMPS / NEFT Realtime Settlement</p>
               
               <div className="pt-2">
-                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
                   isSuccess
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : isPending
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                     : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                 }`}>
-                  <CheckCircle2 className="w-3.5 h-3.5" /> {transaction.status}
+                  {isPending ? <Clock className="w-3.5 h-3.5 animate-pulse" /> : <CheckCircle2 className="w-3.5 h-3.5" />} {transaction.status}
                 </span>
               </div>
             </div>
@@ -227,8 +236,12 @@ export const PayoutReceiptModal: React.FC<PayoutReceiptModalProps> = ({
                 </span>
               </div>
               {transaction.failure_reason && (
-                <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-300 text-xs">
-                  <strong>Failure Reason:</strong> {transaction.failure_reason}
+                <div className={`p-2.5 rounded-lg text-xs ${
+                  isPending
+                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-200'
+                    : 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
+                }`}>
+                  <strong>{isPending ? 'Bank Status / Note:' : 'Failure Reason:'}</strong> {transaction.failure_reason}
                   {transaction.refunded_to_wallet && (
                     <span className="block text-emerald-400 font-bold mt-1">✓ Amount has been refunded to your wallet.</span>
                   )}

@@ -447,7 +447,7 @@ export const b2bApi = {
   }
 };
 
-import type { PayoutSlab, PayoutTransferPayload, PayoutTransaction } from '../types/payout';
+import type { PayoutSlab, PayoutTransferPayload, PayoutTransaction, PayoutBeneficiary, PayoutVerification, VerificationStats } from '../types/payout';
 
 export const payoutApi = {
   getSlabs: async (): Promise<{ success: boolean; slabs: PayoutSlab[] }> => {
@@ -485,8 +485,23 @@ export const payoutApi = {
     return response.data;
   },
 
-  checkStatus: async (orderId: string): Promise<{ success: boolean; data: any; localRecord?: any }> => {
+  verifyAccount: async (payload: { account_number: string; ifsc_code: string; client_reference_id?: string }): Promise<{
+    status: string;
+    success: boolean;
+    message: string;
+    data?: any;
+  }> => {
+    const response = await apiClient.post('/payout/verify-account', payload);
+    return response.data;
+  },
+
+  checkStatus: async (orderId: string): Promise<{ success: boolean; data: any; localRecord?: any; message?: string }> => {
     const response = await apiClient.get(`/payout/status/${encodeURIComponent(orderId)}`);
+    return response.data;
+  },
+
+  reconcile: async (id: string, payload: { action: 'mark_success' | 'mark_failed'; utr_number?: string; note?: string }): Promise<{ success: boolean; message: string; transaction?: any }> => {
+    const response = await apiClient.post(`/payout/reconcile/${encodeURIComponent(id)}`, payload);
     return response.data;
   },
 
@@ -495,12 +510,37 @@ export const payoutApi = {
     return response.data;
   },
 
+  getBeneficiaries: async (): Promise<{ success: boolean; beneficiaries: PayoutBeneficiary[] }> => {
+    const response = await apiClient.get('/payout/beneficiaries');
+    return response.data;
+  },
+
+  saveBeneficiary: async (payload: Partial<PayoutBeneficiary>): Promise<{ success: boolean; message: string; beneficiary: PayoutBeneficiary }> => {
+    const response = await apiClient.post('/payout/beneficiaries', payload);
+    return response.data;
+  },
+
+  deleteBeneficiary: async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.delete(`/payout/beneficiaries/${encodeURIComponent(id)}`);
+    return response.data;
+  },
+
+  getUserVerifications: async (): Promise<{ success: boolean; verifications: PayoutVerification[] }> => {
+    const response = await apiClient.get('/payout/verifications/user');
+    return response.data;
+  },
+
+  getAdminVerifications: async (): Promise<{ success: boolean; verifications: PayoutVerification[]; stats: VerificationStats }> => {
+    const response = await apiClient.get('/payout/verifications/admin');
+    return response.data;
+  },
+
   getSettings: async () => {
     const response = await apiClient.get('/payout/settings');
     return response.data;
   },
 
-  updateSettings: async (data: { instant_payout_enabled: boolean }) => {
+  updateSettings: async (data: { instant_payout_enabled?: boolean; payout_verification_charge?: number; payout_verification_enabled?: boolean }) => {
     const response = await apiClient.post('/payout/settings', data);
     return response.data;
   }

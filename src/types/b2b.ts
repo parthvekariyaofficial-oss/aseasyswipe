@@ -102,6 +102,14 @@ export interface PayBillResponse {
   transaction_id?: string;
   client_transaction_id?: string;
   bbps_txn_ref_id?: string;
+  biller_name?: string;
+  customer_name?: string;
+  customer_mobile?: string;
+  mobile?: string;
+  card_last4?: string;
+  amount?: number;
+  service_charge?: number;
+  total_deducted?: number;
   charge_deducted?: number;
   refunded?: boolean;
   refunded_amount?: number;
@@ -109,8 +117,15 @@ export interface PayBillResponse {
     transaction_id?: string;
     api_txn_id?: string;
     client_transaction_id?: string;
+    bbps_txn_ref_id?: string;
     status?: string;
     payment_status?: string;
+    biller_name?: string;
+    customer_name?: string;
+    customer_mobile?: string;
+    mobile?: string;
+    card_last4?: string;
+    amount?: number;
   };
 }
 

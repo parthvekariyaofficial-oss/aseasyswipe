@@ -53,3 +53,49 @@ export interface PayoutTransaction {
   created_at: string;
   updated_at?: string;
 }
+
+export interface PayoutBeneficiary {
+  id: string;
+  user_id: string;
+  account_number: string;
+  ifsc_code: string;
+  beneficiary_name: string;
+  bank_name?: string;
+  branch?: string;
+  city?: string;
+  is_verified?: boolean;
+  verified_at?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PayoutVerification {
+  id: string;
+  user_id: string;
+  user_name?: string;
+  user_mobile?: string;
+  account_number: string;
+  ifsc_code: string;
+  name_at_bank?: string;
+  bank_name?: string;
+  branch?: string;
+  city?: string;
+  utr?: string;
+  reference_id?: string;
+  client_reference_id?: string;
+  account_status?: string;
+  charge_deducted: number;
+  gateway_charge?: number;
+  status: 'success' | 'failed';
+  failure_reason?: string;
+  created_at: string;
+}
+
+export interface VerificationStats {
+  total_verifications: number;
+  success_count: number;
+  failed_count: number;
+  total_collected: number;
+  total_gateway_cost: number;
+  net_profit: number;
+}

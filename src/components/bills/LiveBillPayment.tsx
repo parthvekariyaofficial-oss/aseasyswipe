@@ -6,7 +6,7 @@ import type {
 } from '../../types/b2b';
 import { 
   CreditCard, Search, ShieldCheck, CheckCircle2, Clock, AlertCircle, ArrowRight, 
-  RefreshCw, FileText, Lock, ChevronDown, Calendar, Filter, RotateCcw, X
+  RefreshCw, FileText, Lock, ChevronDown, Calendar, Filter, RotateCcw, X, Printer
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useAuthStore } from '../../store/authStore';
@@ -505,6 +505,150 @@ export const LiveBillPayment: React.FC = () => {
       (b.biller_id || '').toLowerCase().includes(billerSearch.toLowerCase())
     )
   );
+
+  // Computed values for Credit Card Confirmation & Success Modal
+  const modalCustomerName = 
+    payResult?.customer_name || 
+    payResult?.data?.customer_name || 
+    (fetchResult?.data as any)?.billerResponse?.customerName || 
+    (fetchResult?.data as any)?.billerResponseInfo?.customerName || 
+    (fetchResult?.data as any)?.customerName || 
+    paramValues['Customer Name'] || 
+    'VALUED CARD HOLDER';
+
+  const modalMobile = 
+    payResult?.customer_mobile || 
+    payResult?.data?.customer_mobile || 
+    payResult?.mobile || 
+    mobileNumber || 
+    paramValues['Registered Mobile Number'] || 
+    paramValues['Mobile Number'] || 
+    paramValues['Customer Mobile'] || 
+    (fetchResult?.data as any)?.billerResponse?.mobile || 
+    '—';
+
+  const modalCardLast4 = (() => {
+    if (payResult?.card_last4) {
+      const clean = String(payResult.card_last4).replace(/\D/g, '');
+      if (clean.length >= 4) return clean.slice(-4);
+      if (clean.length > 0) return clean;
+    }
+    if (payResult?.data?.card_last4) {
+      const clean = String(payResult.data.card_last4).replace(/\D/g, '');
+      if (clean.length >= 4) return clean.slice(-4);
+      if (clean.length > 0) return clean;
+    }
+    for (const [key, val] of Object.entries(paramValues)) {
+      const k = key.toLowerCase();
+      if (k.includes('card') || k.includes('last 4') || k.includes('last4')) {
+        const clean = String(val).replace(/\D/g, '');
+        if (clean.length >= 4) return clean.slice(-4);
+        if (clean.length > 0) return clean;
+      }
+    }
+    const fromPay = getCardLast4(payResult) || getCardLast4(payResult?.data);
+    if (fromPay) return fromPay;
+    const fromFetch = getCardLast4(fetchResult?.data) || getCardLast4(fetchResult);
+    if (fromFetch) return fromFetch;
+    for (const [key, val] of Object.entries(paramValues)) {
+      const clean = String(val).replace(/\D/g, '');
+      if (clean.length === 4 && !key.toLowerCase().includes('mobile') && !key.toLowerCase().includes('pin')) {
+        return clean;
+      }
+    }
+    return '';
+  })();
+
+  const modalBillerName = 
+    payResult?.biller_name || 
+    payResult?.data?.biller_name || 
+    selectedBiller?.biller_name || 
+    selectedBiller?.biller_id || 
+    'Credit Card Biller';
+
+  const modalBillAmount = 
+    Number(payResult?.amount || payResult?.data?.amount || payAmount || 0);
+
+  const modalServiceCharge = 
+    Number(payResult?.service_charge || chargeInfo?.serviceCharge || 0);
+
+  const modalTxnId = 
+    payResult?.transaction_id || 
+    payResult?.data?.transaction_id || 
+    payResult?.client_transaction_id || 
+    '—';
+
+  const modalBbpsRefId = 
+    payResult?.bbps_txn_ref_id || 
+    payResult?.data?.bbps_txn_ref_id || 
+    null;
+
+  const handlePrintReceipt = (overrideData?: any) => {
+    const bName = overrideData?.biller_name || modalBillerName;
+    const cName = overrideData?.customer_name || modalCustomerName;
+    const cMob = overrideData?.customer_mobile || overrideData?.mobile || modalMobile;
+    const cCard = overrideData ? (getCardLast4(overrideData) || modalCardLast4) : modalCardLast4;
+    const bAmt = Number(overrideData?.amount ?? modalBillAmount);
+    const sCharge = Number(overrideData?.service_charge ?? modalServiceCharge);
+    const tId = overrideData?.client_transaction_id || overrideData?.transaction_id || overrideData?.id || modalTxnId;
+    const bbpsId = overrideData?.bbps_txn_ref_id || modalBbpsRefId;
+    const dateStr = overrideData?.created_at ? new Date(overrideData.created_at).toLocaleString('en-IN') : new Date().toLocaleString('en-IN');
+    const statusStr = (overrideData?.status || payResult?.status || 'SUCCESS').toUpperCase();
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print receipt');
+      return;
+    }
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt_${tId}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; width: 80mm; margin: 0 auto; padding: 12px; color: #000; font-size: 11px; }
+          .text-center { text-align: center; }
+          .border-b { border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+          .flex-between { display: flex; justify-content: space-between; margin: 4px 0; }
+          .font-bold { font-weight: bold; }
+          .paid-stamp { border: 2px solid #000; padding: 6px; text-align: center; font-weight: bold; margin: 10px 0; text-transform: uppercase; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center border-b">
+          <h2 style="margin: 0; font-size: 14px;">BBPS BILL PAYMENT RECEIPT</h2>
+          <p style="margin: 2px 0; font-size: 10px;">CREDIT CARD BILL PAYMENT</p>
+          <p style="margin: 2px 0; font-size: 9px;">${dateStr}</p>
+        </div>
+        <div class="paid-stamp">${statusStr} - BILL ${statusStr === 'SUCCESS' ? 'PAID' : statusStr}</div>
+        <div class="border-b">
+          <div class="flex-between"><span>Biller Bank:</span><span class="font-bold">${bName}</span></div>
+          <div class="flex-between"><span>Customer Name:</span><span class="font-bold">${cName}</span></div>
+          <div class="flex-between"><span>Mobile:</span><span class="font-bold">${cMob}</span></div>
+          <div class="flex-between"><span>Card (Last 4):</span><span class="font-bold">•••• ${cCard || '----'}</span></div>
+          <div class="flex-between"><span>Bill Amount:</span><span class="font-bold">₹${bAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+          ${sCharge > 0 ? `<div class="flex-between"><span>Convenience Fee:</span><span>+₹${sCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>` : ''}
+          ${sCharge > 0 ? `<div class="flex-between"><span>Total Deducted:</span><span class="font-bold">₹${(bAmt + sCharge).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>` : ''}
+        </div>
+        <div class="border-b">
+          <div class="flex-between"><span>Txn ID:</span><span class="font-bold">${tId}</span></div>
+          ${bbpsId ? `<div class="flex-between"><span>BBPS Ref ID:</span><span class="font-bold">${bbpsId}</span></div>` : ''}
+          <div class="flex-between"><span>Status:</span><span class="font-bold">${statusStr}</span></div>
+        </div>
+        <div class="text-center" style="margin-top: 10px; font-size: 9px;">
+          Computer generated payment receipt.<br/>Thank you for using our BBPS Service!
+        </div>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 300);
+  };
 
   if (!liveBillPayEnabled) {
     return (
@@ -1008,6 +1152,7 @@ export const LiveBillPayment: React.FC = () => {
                   <th className="p-3.5">Mode</th>
                   <th className="p-3.5">Status</th>
                   <th className="p-3.5">Transaction Ref IDs</th>
+                  <th className="p-3.5 text-right">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -1071,6 +1216,17 @@ export const LiveBillPayment: React.FC = () => {
                         <p className="text-emerald-400 text-[10px]">BBPS: {item.bbps_txn_ref_id}</p>
                       )}
                     </td>
+                    <td className="p-3.5 text-right font-sans">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintReceipt(item)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 text-[11px] font-bold transition shadow-sm"
+                        title="Print Receipt"
+                      >
+                        <Printer className="w-3 h-3 text-indigo-400" />
+                        <span>Print</span>
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -1105,55 +1261,213 @@ export const LiveBillPayment: React.FC = () => {
             {payResult ? (
               <div className="space-y-4">
                 {payResult.status === 'success' || payResult.payment_status === 'success' ? (
-                  <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-2xl p-5 text-center space-y-3">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-                    <h4 className="text-lg font-black text-white">Credit Card Bill Paid!</h4>
-                    <p className="text-xs text-emerald-200">{payResult.message || 'Payment confirmed by bank.'}</p>
-                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-left text-xs space-y-1 font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Txn ID:</span>
-                        <span className="text-white font-bold">{payResult.transaction_id || payResult.data?.transaction_id}</span>
+                  <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-2xl p-5 text-center space-y-3.5">
+                    <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400 shadow-lg shadow-emerald-950/50">
+                      <CheckCircle2 className="w-9 h-9" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-white">Credit Card Bill Paid!</h4>
+                      <p className="text-xs text-emerald-200 mt-0.5">{payResult.message || 'Bill Paid successfully'}</p>
+                    </div>
+
+                    {/* ENRICHED TRANSACTION DETAILS CARD */}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left text-xs space-y-2.5 shadow-inner">
+                      {/* Biller Bank */}
+                      <div className="flex justify-between items-start gap-2 pb-2 border-b border-slate-800/80">
+                        <span className="text-slate-400 font-sans">Biller Bank:</span>
+                        <span className="text-white font-extrabold font-sans text-right truncate max-w-[210px]">
+                          {modalBillerName}
+                        </span>
                       </div>
-                      {payResult.bbps_txn_ref_id && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">BBPS Ref ID:</span>
-                          <span className="text-emerald-400 font-bold">{payResult.bbps_txn_ref_id}</span>
+
+                      {/* Customer Name */}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Name:</span>
+                        <span className="text-white font-bold font-sans text-right truncate max-w-[210px]">
+                          {modalCustomerName}
+                        </span>
+                      </div>
+
+                      {/* Customer Mobile */}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Mobile:</span>
+                        <span className="text-slate-200 font-bold font-mono">{modalMobile}</span>
+                      </div>
+
+                      {/* Card (Last 4) */}
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Card (Last 4):</span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider">
+                          <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          •••• {modalCardLast4 || '----'}
+                        </span>
+                      </div>
+
+                      {/* Bill Amount */}
+                      <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-slate-400 font-sans font-medium">Bill Amount:</span>
+                        <span className="text-emerald-400 font-black text-sm font-mono">
+                          ₹{modalBillAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Convenience Fee (if any) */}
+                      {modalServiceCharge > 0 && (
+                        <div className="flex justify-between items-center gap-2 text-[11px]">
+                          <span className="text-slate-500 font-sans">Convenience Fee:</span>
+                          <span className="text-pink-400 font-bold font-mono">
+                            +₹{modalServiceCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Txn ID */}
+                      <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-800/80 font-mono text-[11px]">
+                        <span className="text-slate-400 font-sans">Txn ID:</span>
+                        <span className="text-white font-bold truncate max-w-[210px]">{modalTxnId}</span>
+                      </div>
+
+                      {/* BBPS Ref ID */}
+                      {modalBbpsRefId && (
+                        <div className="flex justify-between items-center gap-2 font-mono text-[11px]">
+                          <span className="text-slate-400 font-sans">BBPS Ref ID:</span>
+                          <span className="text-emerald-400 font-bold">{modalBbpsRefId}</span>
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        setShowPayModal(false);
-                        setFetchResult(null);
-                      }}
-                      className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl"
-                    >
-                      Done & Close
-                    </button>
+
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintReceipt()}
+                        className="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Print Receipt</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPayModal(false);
+                          setPayResult(null);
+                          setFetchResult(null);
+                        }}
+                        className="w-1/2 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition"
+                      >
+                        Done & Close
+                      </button>
+                    </div>
                   </div>
                 ) : payResult.status === 'pending' || payResult.payment_status === 'pending' ? (
-                  <div className="bg-amber-950/50 border border-amber-500/40 rounded-2xl p-5 text-center space-y-3">
-                    <Clock className="w-12 h-12 text-amber-400 mx-auto" />
-                    <h4 className="text-lg font-black text-white">Payment Processing (Pending)</h4>
-                    <p className="text-xs text-amber-200">{payResult.message || 'Processing at biller bank network.'}</p>
-                    <button
-                      onClick={() => setShowPayModal(false)}
-                      className="w-full py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl"
-                    >
-                      Close Window
-                    </button>
+                  <div className="bg-amber-950/50 border border-amber-500/40 rounded-2xl p-5 text-center space-y-3.5">
+                    <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400 shadow-lg shadow-amber-950/50">
+                      <Clock className="w-9 h-9" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-white">Payment Processing (Pending)</h4>
+                      <p className="text-xs text-amber-200 mt-0.5">{payResult.message || 'Processing at biller bank network.'}</p>
+                    </div>
+
+                    {/* ENRICHED TRANSACTION DETAILS CARD */}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left text-xs space-y-2.5 shadow-inner">
+                      <div className="flex justify-between items-start gap-2 pb-2 border-b border-slate-800/80">
+                        <span className="text-slate-400 font-sans">Biller Bank:</span>
+                        <span className="text-white font-extrabold font-sans text-right truncate max-w-[210px]">{modalBillerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Name:</span>
+                        <span className="text-white font-bold font-sans text-right truncate max-w-[210px]">{modalCustomerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Mobile:</span>
+                        <span className="text-slate-200 font-bold font-mono">{modalMobile}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Card (Last 4):</span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider">
+                          <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          •••• {modalCardLast4 || '----'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-slate-400 font-sans font-medium">Bill Amount:</span>
+                        <span className="text-amber-400 font-black text-sm font-mono">₹{modalBillAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-800/80 font-mono text-[11px]">
+                        <span className="text-slate-400 font-sans">Txn ID:</span>
+                        <span className="text-white font-bold truncate max-w-[210px]">{modalTxnId}</span>
+                      </div>
+                      {modalBbpsRefId && (
+                        <div className="flex justify-between items-center gap-2 font-mono text-[11px]">
+                          <span className="text-slate-400 font-sans">BBPS Ref ID:</span>
+                          <span className="text-amber-400 font-bold">{modalBbpsRefId}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintReceipt()}
+                        className="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Print Slip</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPayModal(false)}
+                        className="w-1/2 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition"
+                      >
+                        Close Window
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-rose-950/50 border border-rose-500/40 rounded-2xl p-5 text-center space-y-3">
-                    <AlertCircle className="w-12 h-12 text-rose-400 mx-auto" />
-                    <h4 className="text-lg font-black text-white">Payment Failed</h4>
-                    <p className="text-xs text-rose-200">{payResult.message || 'Payment rejected by gateway.'}</p>
+                  <div className="bg-rose-950/50 border border-rose-500/40 rounded-2xl p-5 text-center space-y-3.5">
+                    <div className="w-14 h-14 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center mx-auto text-rose-400 shadow-lg shadow-rose-950/50">
+                      <AlertCircle className="w-9 h-9" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-white">Payment Failed</h4>
+                      <p className="text-xs text-rose-200 mt-0.5">{payResult.message || 'Payment rejected by gateway.'}</p>
+                    </div>
                     {payResult.refunded && (
-                      <p className="text-xs text-emerald-400 font-bold">✔ Wallet balance auto-refunded.</p>
+                      <p className="text-xs text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 p-2 rounded-xl">
+                        ✔ Wallet balance auto-refunded.
+                      </p>
                     )}
+
+                    {/* ENRICHED TRANSACTION DETAILS CARD */}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-left text-xs space-y-2 shadow-inner">
+                      <div className="flex justify-between items-start gap-2 pb-2 border-b border-slate-800/80">
+                        <span className="text-slate-400 font-sans">Biller Bank:</span>
+                        <span className="text-white font-extrabold font-sans text-right truncate max-w-[210px]">{modalBillerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Name:</span>
+                        <span className="text-white font-bold font-sans text-right truncate max-w-[210px]">{modalCustomerName}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Customer Mobile:</span>
+                        <span className="text-slate-200 font-bold font-mono">{modalMobile}</span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <span className="text-slate-400 font-sans">Card (Last 4):</span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider">
+                          <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          •••• {modalCardLast4 || '----'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-slate-400 font-sans font-medium">Attempted Amount:</span>
+                        <span className="text-rose-400 font-black text-sm font-mono">₹{modalBillAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+
                     <button
                       onClick={() => setPayResult(null)}
-                      className="w-full py-2.5 bg-slate-800 text-white font-bold text-xs rounded-xl"
+                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition"
                     >
                       Try Again
                     </button>
@@ -1168,6 +1482,29 @@ export const LiveBillPayment: React.FC = () => {
                     {payError}
                   </div>
                 )}
+
+                {/* CARD & CUSTOMER SUMMARY BEFORE PAYMENT */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex justify-between items-start gap-2 pb-2 border-b border-slate-800/80">
+                    <span className="text-slate-400">Biller Bank:</span>
+                    <span className="text-white font-extrabold text-right truncate max-w-[210px]">{modalBillerName}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-slate-400">Customer Name:</span>
+                    <span className="text-white font-bold text-right truncate max-w-[210px]">{modalCustomerName}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-slate-400">Customer Mobile:</span>
+                    <span className="text-slate-200 font-mono font-bold">{modalMobile}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-slate-400">Card (Last 4):</span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-200 font-mono text-xs font-bold tracking-wider">
+                      <CreditCard className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      •••• {modalCardLast4 || '----'}
+                    </span>
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">Pay Amount (₹)</label>

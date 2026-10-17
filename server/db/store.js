@@ -20,6 +20,8 @@ export const db = {
     { id: 'poslab_03', min_amount: 25001, max_amount: 200000, charge_type: 'flat', charge_value: 25, is_active: true, created_at: new Date().toISOString() }
   ],
   payout_transactions: [],
+  payout_beneficiaries: [],
+  payout_verifications: [],
   wallet_ledger: [],
   kyc_verifications: [],
   api_fund_requests: [],
@@ -28,7 +30,9 @@ export const db = {
     qr_request_section_enabled: true,
     live_bill_pay_enabled: true,
     instant_payout_enabled: true,
-    cc_bill_pay_enabled: true
+    cc_bill_pay_enabled: true,
+    payout_verification_charge: 5.00,
+    payout_verification_enabled: true
   }
 };
 

@@ -529,7 +529,57 @@ CREATE TABLE IF NOT EXISTS public.api_fund_requests (
 
 CREATE INDEX IF NOT EXISTS idx_fund_req_status ON public.api_fund_requests(status);
 CREATE INDEX IF NOT EXISTS idx_fund_req_wallet ON public.api_fund_requests(wallet_type);
-ALTER TABLE IF EXISTS public.api_fund_requests DISABLE ROW LEVEL SECURITY;
+-- =============================================================================
+-- 15. PAYOUT BENEFICIARIES TABLE (User Saved Beneficiaries / Address Book)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.payout_beneficiaries (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users_profiles(id) ON DELETE CASCADE,
+    account_number VARCHAR(30) NOT NULL,
+    ifsc_code VARCHAR(20) NOT NULL,
+    beneficiary_name TEXT NOT NULL,
+    bank_name TEXT,
+    branch TEXT,
+    city TEXT,
+    is_verified BOOLEAN DEFAULT false,
+    verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, account_number, ifsc_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_payout_ben_user ON public.payout_beneficiaries(user_id);
+ALTER TABLE IF EXISTS public.payout_beneficiaries DISABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- 16. PAYOUT VERIFICATIONS TABLE (Penny Drop Account Validation History)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.payout_verifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users_profiles(id) ON DELETE CASCADE,
+    user_name TEXT,
+    user_mobile TEXT,
+    account_number VARCHAR(30) NOT NULL,
+    ifsc_code VARCHAR(20) NOT NULL,
+    name_at_bank TEXT,
+    bank_name TEXT,
+    branch TEXT,
+    city TEXT,
+    utr VARCHAR(100),
+    reference_id TEXT,
+    client_reference_id TEXT,
+    account_status VARCHAR(30),
+    charge_deducted NUMERIC(10,2) DEFAULT 0.00,
+    gateway_charge NUMERIC(10,2) DEFAULT 0.00,
+    status VARCHAR(20) DEFAULT 'success' CHECK (status IN ('success', 'failed')),
+    failure_reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payout_ver_user ON public.payout_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_payout_ver_created ON public.payout_verifications(created_at);
+ALTER TABLE IF EXISTS public.payout_verifications DISABLE ROW LEVEL SECURITY;
+
 
 
 

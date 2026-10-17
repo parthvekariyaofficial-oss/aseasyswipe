@@ -1466,6 +1466,11 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
 
     return res.status(response.status).json({
       ...response.data,
+      customer_name: customerName,
+      customer_mobile: mobile || '9876543210',
+      biller_name: targetBiller.biller_name || billerId,
+      card_last4: cardLast4,
+      amount: numAmount,
       service_charge: serviceCharge,
       total_deducted: totalDeduction,
       refunded: newTxnEntry.refunded || false,
