@@ -447,7 +447,7 @@ export const b2bApi = {
   }
 };
 
-import type { PayoutSlab, PayoutTransferPayload, PayoutTransaction, PayoutBeneficiary, PayoutVerification, VerificationStats } from '../types/payout';
+import type { PayoutSlab, PayoutTransferPayload, PayoutTransaction, PayoutBeneficiary, PayoutVerification, VerificationStats, PayoutCalculation } from '../types/payout';
 
 export const payoutApi = {
   getSlabs: async (): Promise<{ success: boolean; slabs: PayoutSlab[] }> => {
@@ -470,7 +470,7 @@ export const payoutApi = {
     return response.data;
   },
 
-  calculateCharge: async (amount: number): Promise<{ success: boolean; amount: number; charge_amount: number; total_deducted: number; slab: PayoutSlab | null }> => {
+  calculateCharge: async (amount: number): Promise<{ success: boolean } & PayoutCalculation> => {
     const response = await apiClient.post('/payout/calculate-charge', { amount });
     return response.data;
   },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { payoutApi, userApi, authApi } from '../../services/api';
-import type { PayoutTransaction, PayoutCalculation, PayoutBeneficiary, PayoutVerification } from '../../types/payout';
+import type { PayoutTransaction, PayoutCalculation, PayoutBeneficiary, PayoutVerification, PayoutSlab } from '../../types/payout';
 import { PayoutReceiptModal } from './PayoutReceiptModal';
 import {
   Wallet, ArrowRightLeft, ShieldCheck, CheckCircle2,
@@ -37,6 +37,9 @@ export const UserPayoutTransfer: React.FC = () => {
   // Verification Settings State
   const [payoutVerificationCharge, setPayoutVerificationCharge] = useState<number>(5.00);
   const [payoutVerificationEnabled, setPayoutVerificationEnabled] = useState<boolean>(true);
+
+  // Payout Charge Slabs State
+  const [payoutSlabs, setPayoutSlabs] = useState<PayoutSlab[]>([]);
 
   // Form State
   const [amount, setAmount] = useState<string>('');
@@ -157,9 +160,13 @@ export const UserPayoutTransfer: React.FC = () => {
   const failedHistoryCount = history.filter(t => t.status === 'failed').length;
 
   // Debounced live calculation when amount changes
+  const activePayoutSlabs = payoutSlabs.filter(s => s.is_active !== false);
+  const minPayoutLimit = activePayoutSlabs.length > 0 ? Math.min(...activePayoutSlabs.map(s => Number(s.min_amount))) : 100;
+  const maxPayoutLimit = activePayoutSlabs.length > 0 ? Math.max(...activePayoutSlabs.map(s => Number(s.max_amount))) : 200000;
+
   useEffect(() => {
     const num = parseFloat(amount);
-    if (!amount || isNaN(num) || num < 100 || num > 200000) {
+    if (!amount || isNaN(num) || num <= 0) {
       setCalculation(null);
       return;
     }
@@ -173,25 +180,27 @@ export const UserPayoutTransfer: React.FC = () => {
             amount: res.amount,
             charge_amount: res.charge_amount,
             total_deducted: res.total_deducted,
-            slab: res.slab
+            slab: res.slab,
+            valid: true,
+            min_limit: res.min_limit,
+            max_limit: res.max_limit
           });
+          setFormError('');
+        } else {
+          setCalculation(null);
+          setFormError(res.message || 'Amount is outside active slab bounds');
         }
-      } catch {
-        // Fallback calculation if offline
-        const fallbackCharge = num <= 1000 ? 10 : (num <= 25000 ? 15 : 25);
-        setCalculation({
-          amount: num,
-          charge_amount: fallbackCharge,
-          total_deducted: num + fallbackCharge,
-          slab: null
-        });
+      } catch (err: any) {
+        setCalculation(null);
+        const errorMsg = err.response?.data?.message || err.message || 'Amount is not within any active charge slab.';
+        setFormError(errorMsg);
       } finally {
         setCalcLoading(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [amount]);
+  }, [amount, minPayoutLimit, maxPayoutLimit]);
 
   // Fetch History
   const fetchHistory = async (isInitial = false) => {
@@ -253,10 +262,23 @@ export const UserPayoutTransfer: React.FC = () => {
     } catch {}
   };
 
+  // Fetch Active Payout Slabs
+  const fetchPayoutSlabs = async () => {
+    try {
+      const res = await payoutApi.getSlabs();
+      if (res.success && Array.isArray(res.slabs)) {
+        setPayoutSlabs(res.slabs);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch payout slabs:', e);
+    }
+  };
+
   useEffect(() => {
     fetchBeneficiaries();
     fetchUserVerifications();
     fetchSettings();
+    fetchPayoutSlabs();
   }, []);
 
   useEffect(() => {
@@ -427,8 +449,24 @@ export const UserPayoutTransfer: React.FC = () => {
     setFormError('');
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 100 || numAmount > 200000) {
-      setFormError('Transfer amount must be between ₹100 and ₹2,00,000');
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setFormError('Please enter a valid transfer amount.');
+      return;
+    }
+
+    if (activePayoutSlabs.length > 0) {
+      if (numAmount < minPayoutLimit) {
+        setFormError(`Transfer amount ₹${numAmount.toLocaleString('en-IN')} cannot be less than minimum active slab limit of ₹${minPayoutLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+      if (numAmount > maxPayoutLimit) {
+        setFormError(`Transfer amount ₹${numAmount.toLocaleString('en-IN')} cannot exceed maximum active slab limit of ₹${maxPayoutLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+    }
+
+    if (!calculation || calculation.valid === false) {
+      setFormError(`Transfer amount ₹${numAmount.toLocaleString('en-IN')} does not match any active payout slab.`);
       return;
     }
 
@@ -719,19 +757,24 @@ export const UserPayoutTransfer: React.FC = () => {
 
               {/* Amount */}
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">
-                  Payout Amount (₹) <span className="text-rose-400">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-400">
+                    Payout Amount (₹) <span className="text-rose-400">*</span>
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono">
+                    Active Slab Range: ₹{minPayoutLimit.toLocaleString('en-IN')} - ₹{maxPayoutLimit.toLocaleString('en-IN')}
+                  </span>
+                </div>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-500">₹</span>
                   <input
                     type="number"
-                    min="100"
-                    max="200000"
+                    min={minPayoutLimit}
+                    max={maxPayoutLimit}
                     step="any"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder="Enter amount between 100 and 200000"
+                    placeholder={`Enter amount between ${minPayoutLimit} and ${maxPayoutLimit}`}
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-3.5 text-white font-bold text-base focus:border-indigo-500 focus:outline-none transition-colors"
                     required
                   />

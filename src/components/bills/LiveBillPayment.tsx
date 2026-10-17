@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { b2bApi, authApi } from '../../services/api';
+import { b2bApi, authApi, billRequestApi } from '../../services/api';
 import type { 
   BillerCategory, Biller, BillerInputParam, CustomerParamItem, 
   FetchBillResponse, PayBillResponse 
@@ -160,6 +160,28 @@ export const LiveBillPayment: React.FC = () => {
   const [payingBill, setPayingBill] = useState(false);
   const [payResult, setPayResult] = useState<PayBillResponse | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
+
+  // Active Bill Charge Slabs State
+  const [billSlabs, setBillSlabs] = useState<any[]>([]);
+
+  const loadBillSlabs = async () => {
+    try {
+      const res = await billRequestApi.getSlabs();
+      if (res && res.success && Array.isArray(res.slabs)) {
+        setBillSlabs(res.slabs);
+      }
+    } catch (e) {
+      console.warn('Failed to load bill charge slabs:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadBillSlabs();
+  }, []);
+
+  const activeBillSlabs = billSlabs.filter((s: any) => s.is_active !== false);
+  const minBillLimit = activeBillSlabs.length > 0 ? Math.min(...activeBillSlabs.map((s: any) => Number(s.min_amount))) : 1;
+  const maxBillLimit = activeBillSlabs.length > 0 ? Math.max(...activeBillSlabs.map((s: any) => Number(s.max_amount))) : 200000;
 
   // History State
   const [historyList, setHistoryList] = useState<any[]>([]);
@@ -361,6 +383,10 @@ export const LiveBillPayment: React.FC = () => {
     totalDeduction: number;
     walletBalance: number;
     hasSufficientBalance: boolean;
+    valid?: boolean;
+    message?: string;
+    min_limit?: number;
+    max_limit?: number;
   } | null>(null);
 
   const fetchChargeInfo = async (amt: number) => {
@@ -375,16 +401,47 @@ export const LiveBillPayment: React.FC = () => {
           serviceCharge: res.serviceCharge,
           totalDeduction: res.totalDeduction,
           walletBalance: res.walletBalance,
-          hasSufficientBalance: res.hasSufficientBalance
+          hasSufficientBalance: res.hasSufficientBalance,
+          valid: true,
+          min_limit: res.min_limit,
+          max_limit: res.max_limit
+        });
+      } else {
+        setChargeInfo({
+          serviceCharge: 0,
+          totalDeduction: 0,
+          walletBalance: res?.walletBalance || 0,
+          hasSufficientBalance: false,
+          valid: false,
+          message: res?.message || 'Amount is outside active slab range'
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Error calculating charge:', err);
+      const errMsg = err.response?.data?.message || 'Amount is outside active charge slab limits.';
+      setChargeInfo({
+        serviceCharge: 0,
+        totalDeduction: 0,
+        walletBalance: 0,
+        hasSufficientBalance: false,
+        valid: false,
+        message: errMsg
+      });
     }
   };
 
   // Step 2: Open Payment Modal
   const openPayModal = () => {
+    if (activeBillSlabs.length > 0) {
+      if (payAmount < minBillLimit) {
+        alert(`Bill amount ₹${payAmount.toLocaleString('en-IN')} cannot be less than minimum active slab limit of ₹${minBillLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+      if (payAmount > maxBillLimit) {
+        alert(`Bill amount ₹${payAmount.toLocaleString('en-IN')} exceeds maximum active slab limit of ₹${maxBillLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+    }
     if (payAmount >= 50000) {
       const cleanPan = customerPan.trim().toUpperCase();
       if (!cleanPan) {
@@ -409,6 +466,20 @@ export const LiveBillPayment: React.FC = () => {
     if (!selectedBiller || !fetchResult || !fetchResult.data) return;
     if (payAmount <= 0) {
       alert('Please enter a valid payment amount.');
+      return;
+    }
+    if (activeBillSlabs.length > 0) {
+      if (payAmount < minBillLimit) {
+        setPayError(`Bill amount ₹${payAmount.toLocaleString('en-IN')} cannot be less than minimum active slab limit of ₹${minBillLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+      if (payAmount > maxBillLimit) {
+        setPayError(`Bill amount ₹${payAmount.toLocaleString('en-IN')} exceeds maximum active slab limit of ₹${maxBillLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+    }
+    if (chargeInfo && chargeInfo.valid === false) {
+      setPayError(chargeInfo.message || 'Amount is outside active slab range.');
       return;
     }
     if (chargeInfo && !chargeInfo.hasSufficientBalance) {
@@ -970,34 +1041,43 @@ export const LiveBillPayment: React.FC = () => {
                         Fetched Total Due: <span className="font-bold text-white font-mono">₹{Number(fetchResult.data.billerResponse.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                       </p>
                     </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      Custom Amount Supported
+                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">
+                      Active Slab: ₹{minBillLimit.toLocaleString('en-IN')} - ₹{maxBillLimit.toLocaleString('en-IN')}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-black text-emerald-400">₹</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required
-                        value={payAmount || ''}
-                        onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
-                        placeholder="Enter Amount"
-                        className="w-full bg-slate-950 border border-emerald-500/50 focus:border-emerald-400 rounded-xl py-2.5 pl-8 pr-3 text-xl font-black text-white font-mono focus:outline-none shadow-inner"
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-black text-emerald-400">₹</span>
+                        <input
+                          type="number"
+                          min={minBillLimit}
+                          max={maxBillLimit}
+                          step="0.01"
+                          required
+                          value={payAmount || ''}
+                          onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
+                          placeholder={`Enter Amount (${minBillLimit} - ${maxBillLimit})`}
+                          className="w-full bg-slate-950 border border-emerald-500/50 focus:border-emerald-400 rounded-xl py-2.5 pl-8 pr-3 text-xl font-black text-white font-mono focus:outline-none shadow-inner"
+                        />
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={openPayModal}
-                      disabled={payAmount <= 0}
-                      className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs shadow-lg flex items-center gap-1.5 transition shrink-0"
-                    >
-                      <span>Proceed to Pay</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={openPayModal}
+                        disabled={payAmount <= 0 || (activeBillSlabs.length > 0 && (payAmount < minBillLimit || payAmount > maxBillLimit))}
+                        className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs shadow-lg flex items-center gap-1.5 transition shrink-0"
+                      >
+                        <span>Proceed to Pay</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {payAmount > 0 && activeBillSlabs.length > 0 && (payAmount < minBillLimit || payAmount > maxBillLimit) && (
+                      <p className="text-[11px] text-rose-400 font-bold">
+                        ⚠️ Amount must be between ₹{minBillLimit.toLocaleString('en-IN')} and ₹{maxBillLimit.toLocaleString('en-IN')} as per active slabs.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1525,28 +1605,36 @@ export const LiveBillPayment: React.FC = () => {
                 {/* SLAB CHARGE & WALLET DEDUCTION BREAKDOWN */}
                 {chargeInfo && (
                   <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2 text-xs">
-                    <div className="flex justify-between text-slate-400">
-                      <span>Bill Amount:</span>
-                      <span className="text-white font-bold font-mono">₹{payAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-400">
-                      <span>Slab Convenience Charge:</span>
-                      <span className="text-pink-400 font-bold font-mono">+₹{chargeInfo.serviceCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="border-t border-slate-800 pt-1.5 flex justify-between font-extrabold text-white">
-                      <span>Total Wallet Deduction:</span>
-                      <span className="text-emerald-400 font-mono">₹{chargeInfo.totalDeduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] pt-1 text-slate-400">
-                      <span>Available Wallet Balance:</span>
-                      <span className={`font-mono font-bold ${chargeInfo.hasSufficientBalance ? 'text-slate-200' : 'text-rose-400'}`}>
-                        ₹{chargeInfo.walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    {!chargeInfo.hasSufficientBalance && (
-                      <div className="p-2 rounded-xl bg-rose-950/70 border border-rose-500/30 text-rose-300 text-[11px] font-bold text-center">
-                        ⚠️ Insufficient Wallet Balance! Please top up your wallet.
+                    {chargeInfo.valid === false ? (
+                      <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs font-bold text-center">
+                        ⚠️ {chargeInfo.message || 'Amount is outside the active slab limits.'}
                       </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Bill Amount:</span>
+                          <span className="text-white font-bold font-mono">₹{payAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Slab Convenience Charge:</span>
+                          <span className="text-pink-400 font-bold font-mono">+₹{chargeInfo.serviceCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="border-t border-slate-800 pt-1.5 flex justify-between font-extrabold text-white">
+                          <span>Total Wallet Deduction:</span>
+                          <span className="text-emerald-400 font-mono">₹{chargeInfo.totalDeduction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] pt-1 text-slate-400">
+                          <span>Available Wallet Balance:</span>
+                          <span className={`font-mono font-bold ${chargeInfo.hasSufficientBalance ? 'text-slate-200' : 'text-rose-400'}`}>
+                            ₹{chargeInfo.walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        {!chargeInfo.hasSufficientBalance && (
+                          <div className="p-2 rounded-xl bg-rose-950/70 border border-rose-500/30 text-rose-300 text-[11px] font-bold text-center">
+                            ⚠️ Insufficient Wallet Balance! Please top up your wallet.
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -1645,7 +1733,7 @@ export const LiveBillPayment: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={!user?.tpin_set || payingBill || verifyingTpin || tpin.length !== 4 || (chargeInfo ? !chargeInfo.hasSufficientBalance : false)}
+                    disabled={!user?.tpin_set || payingBill || verifyingTpin || tpin.length !== 4 || (chargeInfo ? (!chargeInfo.hasSufficientBalance || chargeInfo.valid === false) : false)}
                     className="w-1/2 py-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition"
                   >
                     <ShieldCheck className={`w-4 h-4 ${payingBill || verifyingTpin ? 'animate-spin' : ''}`} />

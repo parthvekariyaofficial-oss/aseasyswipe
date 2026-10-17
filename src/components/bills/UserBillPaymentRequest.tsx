@@ -177,6 +177,10 @@ export const UserBillPaymentRequest: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const activeSlabs = slabs.filter((s: any) => s.is_active !== false);
+  const minSlabLimit = activeSlabs.length > 0 ? Math.min(...activeSlabs.map((s: any) => Number(s.min_amount))) : 1;
+  const maxSlabLimit = activeSlabs.length > 0 ? Math.max(...activeSlabs.map((s: any) => Number(s.max_amount))) : 200000;
+
   // Recalculate charge whenever amount or slabs change
   useEffect(() => {
     const numAmt = Number(amount);
@@ -185,13 +189,11 @@ export const UserBillPaymentRequest: React.FC = () => {
       return;
     }
 
-    const matchingSlab = slabs.find(s => numAmt >= Number(s.min_amount) && numAmt <= Number(s.max_amount));
+    const matchingSlab = activeSlabs.find(s => numAmt >= Number(s.min_amount) && numAmt <= Number(s.max_amount));
     if (matchingSlab) {
       setCalculatedCharge(Number(matchingSlab.charge_amount));
     } else {
-      if (numAmt <= 50000) setCalculatedCharge(25);
-      else if (numAmt <= 100000) setCalculatedCharge(50);
-      else setCalculatedCharge(100);
+      setCalculatedCharge(0);
     }
   }, [amount, slabs]);
 
@@ -246,6 +248,22 @@ export const UserBillPaymentRequest: React.FC = () => {
     if (!numAmt || numAmt <= 0) {
       showNotice('error', 'Please enter a valid Amount greater than ₹0');
       return;
+    }
+
+    if (activeSlabs.length > 0) {
+      if (numAmt < minSlabLimit) {
+        showNotice('error', `Amount ₹${numAmt.toLocaleString('en-IN')} cannot be less than minimum active slab limit of ₹${minSlabLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+      if (numAmt > maxSlabLimit) {
+        showNotice('error', `Amount ₹${numAmt.toLocaleString('en-IN')} exceeds maximum active slab limit of ₹${maxSlabLimit.toLocaleString('en-IN')}`);
+        return;
+      }
+      const matchingSlab = activeSlabs.find(s => numAmt >= Number(s.min_amount) && numAmt <= Number(s.max_amount));
+      if (!matchingSlab) {
+        showNotice('error', `Amount ₹${numAmt.toLocaleString('en-IN')} does not fall into any active charge slab`);
+        return;
+      }
     }
 
     if (mobileNumber.length !== 10) {
@@ -422,16 +440,22 @@ export const UserBillPaymentRequest: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Amount */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Bill Amount (₹) <span className="text-rose-400">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-300">
+                    Bill Amount (₹) <span className="text-rose-400">*</span>
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 font-mono">
+                    Active Range: ₹{minSlabLimit.toLocaleString('en-IN')} - ₹{maxSlabLimit.toLocaleString('en-IN')}
+                  </span>
+                </div>
                 <div className="relative">
                   <IndianRupee className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     type="number"
                     required
-                    min="1"
-                    placeholder="e.g. 25000"
+                    min={minSlabLimit}
+                    max={maxSlabLimit}
+                    placeholder={`e.g. between ₹${minSlabLimit} and ₹${maxSlabLimit}`}
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs font-black text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition"

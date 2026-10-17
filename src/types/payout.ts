@@ -16,6 +16,10 @@ export interface PayoutCalculation {
   charge_amount: number;
   total_deducted: number;
   slab: PayoutSlab | null;
+  valid?: boolean;
+  min_limit?: number;
+  max_limit?: number;
+  message?: string;
 }
 
 export interface PayoutTransferPayload {

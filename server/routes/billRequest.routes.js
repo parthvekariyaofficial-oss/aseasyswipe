@@ -5,7 +5,7 @@ import { verifyToken, requireRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Helper to calculate service charge from slabs
+// Helper to calculate service charge from slabs with strict active boundaries
 const calculateServiceCharge = async (amount) => {
   let slabs = [];
 
@@ -25,17 +25,89 @@ const calculateServiceCharge = async (amount) => {
     ];
   }
 
-  const amt = Number(amount);
-  const matchingSlab = slabs.find(s => amt >= Number(s.min_amount) && amt <= Number(s.max_amount));
+  const activeSlabs = slabs.filter(s => s.is_active !== false);
 
-  if (matchingSlab) {
-    return Number(matchingSlab.charge_amount);
+  if (activeSlabs.length === 0) {
+    return {
+      valid: false,
+      message: 'No active charge slabs configured by administrator. Bill requests are temporarily unavailable.',
+      min_limit: 0,
+      max_limit: 0,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
   }
 
-  // Fallback rule if above max slab
-  if (amt <= 50000) return 25;
-  if (amt <= 100000) return 50;
-  return 100;
+  const amt = Number(amount);
+  const minLimit = Math.min(...activeSlabs.map(s => Number(s.min_amount)));
+  const maxLimit = Math.max(...activeSlabs.map(s => Number(s.max_amount)));
+
+  if (isNaN(amt) || amt <= 0) {
+    return {
+      valid: false,
+      message: 'Please provide a valid bill payment amount.',
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  if (amt < minLimit) {
+    return {
+      valid: false,
+      message: `Bill amount ₹${amt.toLocaleString('en-IN')} cannot be less than the minimum active slab limit of ₹${minLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  if (amt > maxLimit) {
+    return {
+      valid: false,
+      message: `Bill amount ₹${amt.toLocaleString('en-IN')} exceeds the maximum active slab limit of ₹${maxLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  const matchingSlab = activeSlabs.find(s => amt >= Number(s.min_amount) && amt <= Number(s.max_amount));
+
+  if (!matchingSlab) {
+    return {
+      valid: false,
+      message: `Bill amount ₹${amt.toLocaleString('en-IN')} does not fall into any active charge slab (Allowed: ₹${minLimit.toLocaleString('en-IN')} to ₹${maxLimit.toLocaleString('en-IN')}).`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  let charge = 0;
+  if (matchingSlab.charge_type === 'percentage') {
+    charge = parseFloat(((amt * Number(matchingSlab.charge_value || matchingSlab.charge_amount)) / 100).toFixed(2));
+  } else {
+    charge = Number(matchingSlab.charge_amount ?? matchingSlab.charge_value ?? 25);
+  }
+
+  return {
+    valid: true,
+    slab: matchingSlab,
+    serviceCharge: charge,
+    totalDeduction: amt + charge,
+    min_limit: minLimit,
+    max_limit: maxLimit
+  };
 };
 
 // =============================================================================
@@ -167,9 +239,13 @@ router.post('/submit', verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Mobile number must be exactly 10 digits' });
     }
 
-    // Calculate service charge according to dynamic slabs
-    const serviceCharge = await calculateServiceCharge(numAmount);
-    const totalDeduction = numAmount + serviceCharge;
+    // Calculate service charge according to dynamic active slabs with strict bounds
+    const chargeCalc = await calculateServiceCharge(numAmount);
+    if (!chargeCalc.valid) {
+      return res.status(400).json({ success: false, message: chargeCalc.message });
+    }
+    const serviceCharge = chargeCalc.serviceCharge;
+    const totalDeduction = chargeCalc.totalDeduction;
 
     // Check user wallet balance
     let currentUser = db.users.find(u => u.id === req.user.id);

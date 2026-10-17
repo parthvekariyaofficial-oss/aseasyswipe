@@ -6,7 +6,7 @@ import { verifyToken, requireRoles } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Helper: Calculate slab charge
+// Helper: Calculate slab charge with strict active slab boundaries
 export const calculatePayoutCharge = async (amount) => {
   const numAmount = parseFloat(amount || 0);
   let slabs = [];
@@ -16,7 +16,6 @@ export const calculatePayoutCharge = async (amount) => {
       const { data, error } = await supabase
         .from('payout_charge_slabs')
         .select('*')
-        .eq('is_active', true)
         .order('min_amount', { ascending: true });
       if (!error && Array.isArray(data) && data.length > 0) {
         slabs = data;
@@ -36,28 +35,90 @@ export const calculatePayoutCharge = async (amount) => {
     ];
   }
 
-  const matchingSlab = slabs.find(
+  // Filter only active slabs
+  const activeSlabs = slabs.filter(s => s.is_active !== false);
+
+  if (activeSlabs.length === 0) {
+    return {
+      valid: false,
+      message: 'No active payout slabs configured by administrator. Payouts are temporarily unavailable.',
+      min_limit: 0,
+      max_limit: 0,
+      slab: null,
+      charge_amount: 0,
+      total_deducted: 0
+    };
+  }
+
+  const minLimit = Math.min(...activeSlabs.map(s => parseFloat(s.min_amount)));
+  const maxLimit = Math.max(...activeSlabs.map(s => parseFloat(s.max_amount)));
+
+  if (isNaN(numAmount) || numAmount <= 0) {
+    return {
+      valid: false,
+      message: 'Please provide a valid transfer amount.',
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      slab: null,
+      charge_amount: 0,
+      total_deducted: 0
+    };
+  }
+
+  if (numAmount < minLimit) {
+    return {
+      valid: false,
+      message: `Payout amount ₹${numAmount.toLocaleString('en-IN')} cannot be less than the minimum active slab limit of ₹${minLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      slab: null,
+      charge_amount: 0,
+      total_deducted: 0
+    };
+  }
+
+  if (numAmount > maxLimit) {
+    return {
+      valid: false,
+      message: `Payout amount ₹${numAmount.toLocaleString('en-IN')} exceeds the maximum active slab limit of ₹${maxLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      slab: null,
+      charge_amount: 0,
+      total_deducted: 0
+    };
+  }
+
+  const matchingSlab = activeSlabs.find(
     s => numAmount >= parseFloat(s.min_amount) && numAmount <= parseFloat(s.max_amount)
   );
 
+  if (!matchingSlab) {
+    return {
+      valid: false,
+      message: `Payout amount ₹${numAmount.toLocaleString('en-IN')} does not match any active slab (Allowed range: ₹${minLimit.toLocaleString('en-IN')} - ₹${maxLimit.toLocaleString('en-IN')}).`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      slab: null,
+      charge_amount: 0,
+      total_deducted: 0
+    };
+  }
+
   let charge = 0;
-  if (matchingSlab) {
-    if (matchingSlab.charge_type === 'percentage') {
-      charge = parseFloat(((numAmount * parseFloat(matchingSlab.charge_value)) / 100).toFixed(2));
-    } else {
-      charge = parseFloat(parseFloat(matchingSlab.charge_value).toFixed(2));
-    }
+  if (matchingSlab.charge_type === 'percentage') {
+    charge = parseFloat(((numAmount * parseFloat(matchingSlab.charge_value)) / 100).toFixed(2));
   } else {
-    // Default fallback slab rule if out of configured slab range
-    if (numAmount <= 1000) charge = 10;
-    else if (numAmount <= 25000) charge = 15;
-    else charge = 25;
+    charge = parseFloat(parseFloat(matchingSlab.charge_value).toFixed(2));
   }
 
   return {
-    slab: matchingSlab || null,
+    valid: true,
+    slab: matchingSlab,
     charge_amount: charge,
-    total_deducted: parseFloat((numAmount + charge).toFixed(2))
+    total_deducted: parseFloat((numAmount + charge).toFixed(2)),
+    min_limit: minLimit,
+    max_limit: maxLimit
   };
 };
 
@@ -259,14 +320,21 @@ router.post('/calculate-charge', verifyToken, async (req, res) => {
     const { amount } = req.body;
     const numAmount = parseFloat(amount || 0);
 
-    if (isNaN(numAmount) || numAmount < 100 || numAmount > 200000) {
+    if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Amount must be between ₹100 and ₹2,00,000'
+        message: 'Please provide a valid transfer amount.'
       });
     }
 
     const calculation = await calculatePayoutCharge(numAmount);
+    if (!calculation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: calculation.message,
+        ...calculation
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -328,10 +396,10 @@ router.post('/transfer', verifyToken, async (req, res) => {
 
     // 2. Basic Validations
     const numAmount = parseFloat(amount || 0);
-    if (isNaN(numAmount) || numAmount < 100 || numAmount > 200000) {
+    if (isNaN(numAmount) || numAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid transfer amount. Payout amount must be between ₹100 and ₹2,00,000.'
+        message: 'Invalid transfer amount. Please enter a valid positive amount.'
       });
     }
 
@@ -393,8 +461,15 @@ router.post('/transfer', verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User account not found' });
     }
 
-    // 5. Dynamic Slab Charge Calculation
-    const { slab, charge_amount, total_deducted } = await calculatePayoutCharge(numAmount);
+    // 5. Dynamic Active Slab Charge Calculation & Strict Boundary Validation
+    const calcResult = await calculatePayoutCharge(numAmount);
+    if (!calcResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: calcResult.message
+      });
+    }
+    const { slab, charge_amount, total_deducted } = calcResult;
     deductedAmount = total_deducted;
 
     // 6. Wallet Balance Check

@@ -997,7 +997,7 @@ router.post('/fetch-bill', verifyToken, async (req, res) => {
   return await executeFetchWithRetry(2);
 });
 
-// Helper: Calculate service charge from charge slabs (same slabs as offline bill requests)
+// Helper: Calculate service charge from charge slabs with strict active boundaries
 const calculateServiceCharge = async (amount) => {
   let slabs = [];
 
@@ -1017,16 +1017,89 @@ const calculateServiceCharge = async (amount) => {
     ];
   }
 
-  const amt = Number(amount);
-  const matchingSlab = slabs.find(s => amt >= Number(s.min_amount) && amt <= Number(s.max_amount));
+  const activeSlabs = slabs.filter(s => s.is_active !== false);
 
-  if (matchingSlab) {
-    return Number(matchingSlab.charge_amount);
+  if (activeSlabs.length === 0) {
+    return {
+      valid: false,
+      message: 'No active bill payment charge slabs found. Bill payments are temporarily unavailable.',
+      min_limit: 0,
+      max_limit: 0,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
   }
 
-  if (amt <= 50000) return 25;
-  if (amt <= 100000) return 50;
-  return 100;
+  const amt = Number(amount);
+  const minLimit = Math.min(...activeSlabs.map(s => Number(s.min_amount)));
+  const maxLimit = Math.max(...activeSlabs.map(s => Number(s.max_amount)));
+
+  if (isNaN(amt) || amt <= 0) {
+    return {
+      valid: false,
+      message: 'Please provide a valid bill payment amount.',
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  if (amt < minLimit) {
+    return {
+      valid: false,
+      message: `Bill payment amount ₹${amt.toLocaleString('en-IN')} cannot be less than the minimum active slab limit of ₹${minLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  if (amt > maxLimit) {
+    return {
+      valid: false,
+      message: `Bill payment amount ₹${amt.toLocaleString('en-IN')} exceeds the maximum active slab limit of ₹${maxLimit.toLocaleString('en-IN')}.`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  const matchingSlab = activeSlabs.find(s => amt >= Number(s.min_amount) && amt <= Number(s.max_amount));
+
+  if (!matchingSlab) {
+    return {
+      valid: false,
+      message: `Bill payment amount ₹${amt.toLocaleString('en-IN')} does not fall into any active charge slab (Allowed: ₹${minLimit.toLocaleString('en-IN')} to ₹${maxLimit.toLocaleString('en-IN')}).`,
+      min_limit: minLimit,
+      max_limit: maxLimit,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      slab: null
+    };
+  }
+
+  let charge = 0;
+  if (matchingSlab.charge_type === 'percentage') {
+    charge = parseFloat(((amt * Number(matchingSlab.charge_value || matchingSlab.charge_amount)) / 100).toFixed(2));
+  } else {
+    charge = Number(matchingSlab.charge_amount ?? matchingSlab.charge_value ?? 25);
+  }
+
+  return {
+    valid: true,
+    slab: matchingSlab,
+    serviceCharge: charge,
+    totalDeduction: amt + charge,
+    min_limit: minLimit,
+    max_limit: maxLimit
+  };
 };
 
 /**
@@ -1035,8 +1108,7 @@ const calculateServiceCharge = async (amount) => {
  */
 router.get('/calculate-charge', verifyToken, async (req, res) => {
   const amount = Number(req.query.amount || 0);
-  const serviceCharge = await calculateServiceCharge(amount);
-  const totalDeduction = amount + serviceCharge;
+  const chargeCalc = await calculateServiceCharge(amount);
 
   let currentUser = null;
   if (supabase) {
@@ -1051,13 +1123,27 @@ router.get('/calculate-charge', verifyToken, async (req, res) => {
 
   const walletBalance = Number(currentUser?.wallet_balance || 0);
 
+  if (!chargeCalc.valid) {
+    return res.status(400).json({
+      success: false,
+      message: chargeCalc.message,
+      amount,
+      serviceCharge: 0,
+      totalDeduction: 0,
+      walletBalance,
+      hasSufficientBalance: false,
+      ...chargeCalc
+    });
+  }
+
   return res.status(200).json({
     success: true,
     amount,
-    serviceCharge,
-    totalDeduction,
+    serviceCharge: chargeCalc.serviceCharge,
+    totalDeduction: chargeCalc.totalDeduction,
     walletBalance,
-    hasSufficientBalance: walletBalance >= totalDeduction
+    hasSufficientBalance: walletBalance >= chargeCalc.totalDeduction,
+    ...chargeCalc
   });
 });
 
@@ -1223,9 +1309,13 @@ router.post('/pay-bill', verifyToken, async (req, res) => {
     } catch (e) {}
   }
 
-  // 2. CALCULATE SLAB SERVICE CHARGE & TOTAL DEDUCTION
-  const serviceCharge = await calculateServiceCharge(numAmount);
-  const totalDeduction = numAmount + serviceCharge;
+  // 2. CALCULATE SLAB SERVICE CHARGE & TOTAL DEDUCTION WITH STRICT BOUNDARY VALIDATION
+  const chargeCalc = await calculateServiceCharge(numAmount);
+  if (!chargeCalc.valid) {
+    return res.status(400).json({ status: 'failed', message: chargeCalc.message });
+  }
+  const serviceCharge = chargeCalc.serviceCharge;
+  const totalDeduction = chargeCalc.totalDeduction;
 
   // 3. CHECK USER WALLET BALANCE
   let currentUser = null;
