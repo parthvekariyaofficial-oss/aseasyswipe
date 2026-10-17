@@ -540,7 +540,12 @@ export const payoutApi = {
     return response.data;
   },
 
-  updateSettings: async (data: { instant_payout_enabled?: boolean; payout_verification_charge?: number; payout_verification_enabled?: boolean }) => {
+  updateSettings: async (data: {
+    instant_payout_enabled?: boolean;
+    payout_verification_charge?: number;
+    payout_verification_gateway_cost?: number;
+    payout_verification_enabled?: boolean;
+  }) => {
     const response = await apiClient.post('/payout/settings', data);
     return response.data;
   }

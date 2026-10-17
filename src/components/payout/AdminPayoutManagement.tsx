@@ -30,6 +30,7 @@ export const AdminPayoutManagement: React.FC = () => {
 
   // Verification Settings State
   const [payoutVerificationCharge, setPayoutVerificationCharge] = useState<number>(5.00);
+  const [payoutVerificationGatewayCost, setPayoutVerificationGatewayCost] = useState<number>(3.00);
   const [payoutVerificationEnabled, setPayoutVerificationEnabled] = useState<boolean>(true);
   const [savingVerifSettings, setSavingVerifSettings] = useState<boolean>(false);
 
@@ -133,6 +134,9 @@ export const AdminPayoutManagement: React.FC = () => {
         if (res.settings.payout_verification_charge !== undefined) {
           setPayoutVerificationCharge(Number(res.settings.payout_verification_charge));
         }
+        if (res.settings.payout_verification_gateway_cost !== undefined) {
+          setPayoutVerificationGatewayCost(Number(res.settings.payout_verification_gateway_cost));
+        }
         if (res.settings.payout_verification_enabled !== undefined) {
           setPayoutVerificationEnabled(Boolean(res.settings.payout_verification_enabled));
         }
@@ -148,12 +152,13 @@ export const AdminPayoutManagement: React.FC = () => {
     try {
       const res = await payoutApi.updateSettings({
         payout_verification_charge: Number(payoutVerificationCharge),
+        payout_verification_gateway_cost: Number(payoutVerificationGatewayCost),
         payout_verification_enabled: Boolean(payoutVerificationEnabled)
       });
       if (res.success) {
         setActionAlert({
           type: 'success',
-          message: `✅ Penny Drop Verification settings saved: ₹${Number(payoutVerificationCharge).toFixed(2)} user fee (${payoutVerificationEnabled ? 'Active' : 'Disabled'}).`
+          message: `✅ Penny Drop Verification settings saved: ₹${Number(payoutVerificationCharge).toFixed(2)} user fee, ₹${Number(payoutVerificationGatewayCost).toFixed(2)} wholesale cost (${payoutVerificationEnabled ? 'Active' : 'Disabled'}).`
         });
       } else {
         setActionAlert({
@@ -555,7 +560,7 @@ export const AdminPayoutManagement: React.FC = () => {
   const successVerifsCount = verifications.filter(v => v.status === 'success').length;
   const failedVerifsCount = verifications.filter(v => v.status === 'failed').length;
   const totalVerifsFee = verifications.reduce((acc, curr) => acc + Number(curr.charge_deducted || 0), 0);
-  const totalVerifsCost = verifications.reduce((acc, curr) => acc + (curr.status === 'success' ? Number(curr.gateway_charge || 3.00) : 0), 0);
+  const totalVerifsCost = verifications.reduce((acc, curr) => acc + (curr.status === 'success' ? Number(curr.gateway_charge !== undefined && curr.gateway_charge !== null ? curr.gateway_charge : payoutVerificationGatewayCost) : 0), 0);
   const totalVerifsProfit = Number((totalVerifsFee - totalVerifsCost).toFixed(2));
 
   return (
@@ -1085,17 +1090,32 @@ export const AdminPayoutManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-col justify-end">
-                  <span className="text-[10px] text-slate-400 mb-1">Gateway Wholesale</span>
-                  <div className="px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 font-bold">
-                    ₹3.00 <span className="text-[10px] font-normal text-slate-400">/ success</span>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                    Gateway Wholesale (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={payoutVerificationGatewayCost}
+                      onChange={(e) => setPayoutVerificationGatewayCost(parseFloat(e.target.value) || 0)}
+                      className="w-28 pl-7 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm focus:border-indigo-500 focus:outline-none font-mono"
+                      required
+                    />
                   </div>
                 </div>
 
                 <div className="flex flex-col justify-end">
                   <span className="text-[10px] text-emerald-400 mb-1 font-bold">Platform Margin</span>
-                  <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-mono text-emerald-400 font-bold">
-                    +₹{Math.max(0, payoutVerificationCharge - 3).toFixed(2)} <span className="text-[10px] font-normal">profit</span>
+                  <div className={`px-3 py-2 rounded-xl text-xs font-mono font-bold border ${
+                    payoutVerificationCharge >= payoutVerificationGatewayCost
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  }`}>
+                    {payoutVerificationCharge >= payoutVerificationGatewayCost ? '+' : ''}₹{(payoutVerificationCharge - payoutVerificationGatewayCost).toFixed(2)} <span className="text-[10px] font-normal">profit</span>
                   </div>
                 </div>
 
@@ -1168,7 +1188,7 @@ export const AdminPayoutManagement: React.FC = () => {
                 <span className="text-xl font-black text-emerald-300 font-mono">
                   ₹{(verificationStats?.net_profit ?? totalVerifsProfit).toFixed(2)}
                 </span>
-                <span className="text-[10px] text-emerald-500/80 block mt-0.5">After ₹3/verif cost</span>
+                <span className="text-[10px] text-emerald-500/80 block mt-0.5">After ₹{payoutVerificationGatewayCost.toFixed(2)}/verif cost</span>
               </div>
             </div>
           </div>

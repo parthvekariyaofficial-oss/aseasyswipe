@@ -1252,7 +1252,7 @@ router.post('/verify-account', verifyToken, async (req, res) => {
       client_reference_id: client_reference_id || `VFY_${Date.now()}`,
       account_status: liveData.account_status || 'ACTIVE',
       charge_deducted: verificationCharge,
-      gateway_charge: Number(liveData.charge_deducted || 3.00),
+      gateway_charge: Number(db.system_settings?.payout_verification_gateway_cost !== undefined ? db.system_settings.payout_verification_gateway_cost : (liveData.charge_deducted || 3.00)),
       status: 'success',
       failure_reason: null,
       created_at: new Date().toISOString()
@@ -1442,7 +1442,8 @@ router.get('/verifications/admin', verifyToken, requireRoles(['admin']), async (
     const successCount = list.filter(v => v.status === 'success').length;
     const failedCount = list.filter(v => v.status === 'failed').length;
     const totalCollected = list.reduce((acc, curr) => acc + Number(curr.charge_deducted || 0), 0);
-    const totalGatewayCost = list.reduce((acc, curr) => acc + (curr.status === 'success' ? Number(curr.gateway_charge || 3.00) : 0), 0);
+    const configuredGatewayCost = Number(db.system_settings?.payout_verification_gateway_cost !== undefined ? db.system_settings.payout_verification_gateway_cost : 3.00);
+    const totalGatewayCost = list.reduce((acc, curr) => acc + (curr.status === 'success' ? Number(curr.gateway_charge !== undefined && curr.gateway_charge !== null ? curr.gateway_charge : configuredGatewayCost) : 0), 0);
     const netProfit = Number((totalCollected - totalGatewayCost).toFixed(2));
 
     return res.status(200).json({
@@ -1785,6 +1786,7 @@ router.get('/settings', verifyToken, async (req, res) => {
       settings: {
         instant_payout_enabled: db.system_settings.instant_payout_enabled !== false,
         payout_verification_charge: Number(db.system_settings.payout_verification_charge !== undefined ? db.system_settings.payout_verification_charge : 5.00),
+        payout_verification_gateway_cost: Number(db.system_settings.payout_verification_gateway_cost !== undefined ? db.system_settings.payout_verification_gateway_cost : 3.00),
         payout_verification_enabled: db.system_settings.payout_verification_enabled !== false
       }
     });
@@ -1806,16 +1808,20 @@ router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) 
         live_bill_pay_enabled: true,
         instant_payout_enabled: true,
         payout_verification_charge: 5.00,
+        payout_verification_gateway_cost: 3.00,
         payout_verification_enabled: true
       };
     }
 
-    const { instant_payout_enabled, payout_verification_charge, payout_verification_enabled } = req.body;
+    const { instant_payout_enabled, payout_verification_charge, payout_verification_gateway_cost, payout_verification_enabled } = req.body;
     if (instant_payout_enabled !== undefined) {
       db.system_settings.instant_payout_enabled = Boolean(instant_payout_enabled);
     }
     if (payout_verification_charge !== undefined) {
       db.system_settings.payout_verification_charge = Math.max(0, parseFloat(payout_verification_charge) || 0);
+    }
+    if (payout_verification_gateway_cost !== undefined) {
+      db.system_settings.payout_verification_gateway_cost = Math.max(0, parseFloat(payout_verification_gateway_cost) || 0);
     }
     if (payout_verification_enabled !== undefined) {
       db.system_settings.payout_verification_enabled = Boolean(payout_verification_enabled);
@@ -1841,6 +1847,7 @@ router.post('/settings', verifyToken, requireRoles(['admin']), async (req, res) 
       settings: {
         instant_payout_enabled: db.system_settings.instant_payout_enabled,
         payout_verification_charge: db.system_settings.payout_verification_charge,
+        payout_verification_gateway_cost: db.system_settings.payout_verification_gateway_cost,
         payout_verification_enabled: db.system_settings.payout_verification_enabled
       }
     });

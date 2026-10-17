@@ -32,6 +32,7 @@ export const db = {
     instant_payout_enabled: true,
     cc_bill_pay_enabled: true,
     payout_verification_charge: 5.00,
+    payout_verification_gateway_cost: 3.00,
     payout_verification_enabled: true
   }
 };
